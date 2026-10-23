@@ -1,7 +1,7 @@
 """NOVA (Fase 2, Mudança 4): figuras de duração."""
 
 from enum import Enum
-
+BEATS_POR_SEMIBREVE = 4
 
 class Duracao(Enum):
     """Figura de duração, identificada pelo número usado no texto ("A:3").
@@ -30,20 +30,21 @@ class Duracao(Enum):
         Raises:
             ValueError: identificador fora de 1–7.
         """
-        raise NotImplementedError
+        try:
+            return cls(identificador)
+        except ValueError:
+            ValueError(f"Duração Inválida: {identificador}! (Use 1 a 7)")
+
 
     @classmethod
     def padrao(cls) -> "Duracao":
         """Duração usada quando a nota/pausa não traz ":n".
-
-        TODO (decisão do grupo): o enunciado não define. Sugestão: SEMINIMA.
         """
-        raise NotImplementedError
+        return cls.SEMINIMA
 
     def fracao_da_semibreve(self) -> float:
-        """1, 1/2, 1/4, ..., 1/64."""
-        raise NotImplementedError
+        return 1/ 2**(self.value - 1)
 
     def em_beats(self) -> float:
         """Duração em beats (unidade usada pelo BPM e pelo atraso [n])."""
-        raise NotImplementedError
+        return self.fracao_da_semibreve() * BEATS_POR_SEMIBREVE
