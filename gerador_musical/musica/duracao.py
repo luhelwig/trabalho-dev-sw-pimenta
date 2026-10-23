@@ -33,7 +33,7 @@ class Duracao(Enum):
         try:
             return cls(identificador)
         except ValueError:
-            ValueError(f"Duração Inválida: {identificador}! (Use 1 a 7)")
+            raise ValueError(f"Duração Inválida: {identificador}! (Use 1 a 7)")
 
 
     @classmethod
