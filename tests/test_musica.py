@@ -2,31 +2,41 @@
 ConfiguracaoInicial e Partitura."""
 
 import pytest
+from gerador_musical.musica.duracao import Duracao
+from gerador_musical.musica.nota_musical import NotaMusical, Acidente
 
 # ---- Duracao / NotaMusical ---------------------------------------------
 
 
-def test_duracao_from_identificador():
-    """1 -> SEMIBREVE ... 7 -> SEMIFUSA; 0 e 8 -> ValueError."""
-    pytest.skip("TODO")
+@pytest.mark.parametrize("identificador, esperado", [
+    (1, Duracao.SEMIBREVE), (3, Duracao.SEMINIMA), (7, Duracao.SEMIFUSA),
+])
+def test_duracao_from_identificador(identificador, esperado):
+    assert Duracao.from_identificador(identificador) is esperado
 
+@pytest.mark.parametrize("identificador", [0, 8])
+def test_identificador_invalido(identificador):
+    with pytest.raises(ValueError):
+        Duracao.from_identificador(identificador)
 
 def test_cada_duracao_vale_metade_da_anterior():
-    pytest.skip("TODO")
-
+    figuras = list(Duracao)
+    for i in range(len(figuras) - 1):
+        assert figuras[i + 1].em_beats() == figuras[i].em_beats() / 2
 
 def test_do_central_e_60():
     """NotaMusical('C').altura_midi(4) == 60."""
-    pytest.skip("TODO")
+    assert NotaMusical("C").altura_midi(4) == 60
 
 
 def test_la_4_e_69():
     """NotaMusical('A').altura_midi(4) == 69."""
-    pytest.skip("TODO")
+    assert NotaMusical("A").altura_midi(4) == 69
 
 
 def test_sustenido_sobe_e_bemol_desce_um_semitom():
-    pytest.skip("TODO")
+    assert NotaMusical("C", Acidente.SUSTENIDO).altura_midi(4) == 61
+    assert NotaMusical("E", Acidente.BEMOL).altura_midi(4) == 63
 
 
 # ---- ParametrosMusica ---------------------------------------------------
