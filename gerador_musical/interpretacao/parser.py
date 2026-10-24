@@ -39,11 +39,14 @@ class Parser:
 
     def interpretar(self, texto: str) -> Partitura:
         """NOVO — atalho: texto_to_token + token_to_partitura."""
-        raise NotImplementedError
+        self.texto_to_token(texto)
+        return self.token_to_partitura()
 
     def texto_to_token(self, texto: str) -> list[list[Token]]:
         """Separa o texto em linhas e tokeniza cada uma. Guarda em self.tokens."""
-        raise NotImplementedError
+        self.texto = texto
+        self.tokens = [self._tokenizador.tokenizar(linha) for linha in self._separar_linhas(texto)]
+        return self.tokens
 
     def token_to_partitura(self, tokens: list[list[Token]] | None = None) -> Partitura:
         """Monta a Partitura a partir dos tokens (padrão: self.tokens).
@@ -51,7 +54,13 @@ class Parser:
         Cria uma Voz por linha com os parâmetros iniciais vindos de
         ConfiguracaoInicial.criar_parametros(indice).
         """
-        raise NotImplementedError
+        if tokens is None:
+            tokens = self.tokens
+        partitura = Partitura(self._configuracao.get_bpm_inicial())
+        for indice, tokens_da_linha in enumerate(tokens):
+            partitura.adicionar_voz(self._interpretar_linha(indice, tokens_da_linha, partitura))
+        self.partitura = partitura
+        return partitura
 
     def _separar_linhas(self, texto: str) -> list[str]:
         """Quebra em linhas (aceitar '\\n' e '\\r\\n').
@@ -60,11 +69,16 @@ class Parser:
         (mantém a numeração V0, V1...) ou é descartada? E linhas além de 4:
         ciclam (requisitos) ou são recusadas ("NESTE TRABALHO, 4 vozes")?
         """
-        raise NotImplementedError
+        return texto.splitlines()
 
     def _interpretar_linha(self, indice: int, tokens: list[Token], partitura: Partitura) -> Voz:
         """Aplica o mapeamento a cada token de uma linha e devolve a Voz."""
-        raise NotImplementedError
+        voz = Voz(indice, self._configuracao.criar_parametros(indice))
+        contexto = ContextoInterpretacao(voz, partitura)
+        for token in tokens:
+            self._aplicar(token, contexto)
+        return voz
 
     def _aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        self._mapeamento.aplicar(token, contexto)
+        contexto.avancar(token)
