@@ -41,17 +41,26 @@ class EventoMusical:
         cls, nota: NotaMusical, duracao: Duracao, parametros: ParametrosMusica
     ) -> "EventoMusical":
         """Cria uma nota copiando instrumento/oitava/volume ATUAIS da voz."""
-        raise NotImplementedError
+        return cls(
+            tipo=TipoEvento.NOTA,
+            duracao=duracao,
+            nota=nota,
+            instrumento=parametros.get_instrumento(),
+            oitava=parametros.get_oitava(),
+            volume=parametros.get_volume())
 
     @classmethod
     def criar_pausa(cls, duracao: Duracao) -> "EventoMusical":
-        raise NotImplementedError
+        return cls(
+            tipo=TipoEvento.PAUSA,
+            duracao=duracao
+        )
 
     def eh_nota(self) -> bool:
-        raise NotImplementedError
+        return self.tipo is TipoEvento.NOTA
 
     def eh_pausa(self) -> bool:
-        raise NotImplementedError
+        return self.tipo is TipoEvento.PAUSA
 
     def altura_midi(self) -> int:
         """NOVO — número MIDI da nota (usa nota.altura_midi(oitava)).
@@ -59,7 +68,10 @@ class EventoMusical:
         Raises:
             ValueError: se o evento for pausa.
         """
-        raise NotImplementedError
+        if self.nota is None:
+            raise ValueError("Pausa sem altura")
+        else:
+            return self.nota.altura_midi(self.oitava)
 
     def duracao_em_beats(self) -> float:
-        raise NotImplementedError
+        return self.duracao.em_beats()

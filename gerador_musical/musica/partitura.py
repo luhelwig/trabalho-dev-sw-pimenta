@@ -1,9 +1,8 @@
 """NOVA (Fase 2): resultado da interpretação — todas as vozes + andamento."""
 
 from dataclasses import dataclass
-
 from gerador_musical.musica.voz import Voz
-
+from gerador_musical.musica.limites import BPM_MAXIMO, BPM_MINIMO
 
 @dataclass(frozen=True)
 class MudancaAndamento:
@@ -27,33 +26,40 @@ class Partitura:
         self.mudancas_andamento: list[MudancaAndamento] = []
 
     def adicionar_voz(self, voz: Voz) -> None:
-        raise NotImplementedError
+        self.vozes.append(voz)
 
     def get_vozes(self) -> list[Voz]:
-        raise NotImplementedError
+        return list(self.vozes)
 
     def numero_de_vozes(self) -> int:
-        raise NotImplementedError
+        return len(self.vozes)
 
     def get_bpm_inicial(self) -> int:
-        raise NotImplementedError
+        return self.bpm_inicial
 
     def registrar_mudanca_andamento(self, posicao_beats: float, delta_bpm: int) -> None:
-        raise NotImplementedError
+        self.mudancas_andamento.append(MudancaAndamento(posicao_beats, delta_bpm))
 
     def get_mudancas_andamento(self) -> list[MudancaAndamento]:
         """Mudanças ordenadas por posição (vale para TODAS as vozes)."""
-        raise NotImplementedError
+        return sorted(self.mudancas_andamento, key=lambda m: m.posicao_beats)
 
     def bpm_em(self, posicao_beats: float) -> int:
         """BPM efetivo num ponto: bpm_inicial + deltas anteriores, limitado
         a [BPM_MINIMO, BPM_MAXIMO]."""
-        raise NotImplementedError
+        bpm = self.bpm_inicial
+        for m in self.get_mudancas_andamento():
+            if m.posicao_beats > posicao_beats:
+                break
+            else:
+                bpm = min(max(bpm + m.delta_bpm, BPM_MINIMO), BPM_MAXIMO)
+        return bpm
 
     def duracao_total_beats(self) -> float:
         """Duração da voz mais longa (incluindo atrasos)."""
-        raise NotImplementedError
+        return max((v.duracao_total_beats() for v in self.vozes), default=0)
+
 
     def esta_vazia(self) -> bool:
         """True se nenhuma voz tem eventos."""
-        raise NotImplementedError
+        return all(v.esta_vazia() for v in self.vozes)

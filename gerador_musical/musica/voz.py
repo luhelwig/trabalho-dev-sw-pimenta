@@ -19,10 +19,10 @@ class Voz:
         self.eventos: list[EventoMusical] = []
 
     def adicionar_evento(self, evento: EventoMusical) -> None:
-        raise NotImplementedError
+        self.eventos.append(evento)
 
     def get_eventos(self) -> list[EventoMusical]:
-        raise NotImplementedError
+        return list(self.eventos)
 
     def set_atraso(self, beats: float) -> None:
         """Atraso de entrada vindo de "[n]" no início da linha.
@@ -30,28 +30,38 @@ class Voz:
         Raises:
             ValueError: atraso negativo.
         """
-        raise NotImplementedError
+        if beats < 0:
+            raise ValueError("atraso negativo.")
+        else:
+            self.atraso_beats = beats
 
     def get_atraso(self) -> float:
-        raise NotImplementedError
+        return self.atraso_beats
 
     def posicao_atual_beats(self) -> float:
         """Onde a voz está agora: atraso + soma das durações já adicionadas.
 
         Usada para posicionar mudanças de andamento ('>' / '<') no tempo.
         """
-        raise NotImplementedError
+        return self.atraso_beats + sum(e.duracao_em_beats() for e in self.eventos)
 
     def duracao_total_beats(self) -> float:
-        raise NotImplementedError
+        return self.posicao_atual_beats()
 
     def ultima_nota(self) -> EventoMusical | None:
         """Último evento do tipo nota (para a regra de repetir nota)."""
-        raise NotImplementedError
+        for evento in reversed(self.eventos):
+            if evento.eh_nota():
+                return evento
+        return None
 
     def canal_midi(self) -> int:
         """Canal MIDI da voz, pulando o canal de percussão (9)."""
-        raise NotImplementedError
+        canal = self.indice % 15
+        if canal < self.CANAL_PERCUSSAO_MIDI:
+            return canal
+        else:
+            return canal + 1
 
     def esta_vazia(self) -> bool:
-        raise NotImplementedError
+        return not self.eventos

@@ -7,6 +7,11 @@ from gerador_musical.musica.nota_musical import NotaMusical, Acidente
 from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
 from gerador_musical.musica.instrumentos import CRAVO, FAGOTE, ORGAO_DE_IGREJA, PIANO, CatalogoInstrumentos
 from gerador_musical.musica.parametros_musica import ParametrosMusica
+from gerador_musical.musica.evento_musical import EventoMusical
+from gerador_musical.musica.partitura import Partitura
+from gerador_musical.musica.voz import Voz
+from gerador_musical.musica import instrumentos
+
 
 # ---- Duracao / NotaMusical ---------------------------------------------
 
@@ -85,16 +90,28 @@ def test_reset_instrumento_volta_ao_inicial():
 
 
 def test_padroes_por_voz():
-    """V0..V3: oitavas 6,5,4,3; volumes 100,80,60,40; Cravo, Órgão, Piano, Fagote."""
-    pytest.skip("TODO")
+    c = ConfiguracaoInicial.padrao()
+    assert [c.get_oitava_inicial(i) for i in range(4)] == [6, 5, 4, 3]
+    assert [c.get_volume_inicial(i) for i in range(4)] == [100, 80, 60, 40]
+    assert [c.get_instrumento_inicial(i) for i in range(4)] == [
+        instrumentos.CRAVO,
+        instrumentos.ORGAO_DE_IGREJA,
+        instrumentos.PIANO,
+        instrumentos.FAGOTE,
+    ]
 
 
 def test_voz_4_cicla_para_padroes_da_voz_0():
-    pytest.skip("TODO")
+    c = ConfiguracaoInicial.padrao()
+    assert c.get_oitava_inicial(4) == c.get_oitava_inicial(0)
+    assert c.get_volume_inicial(4) == c.get_volume_inicial(0)
+    assert c.get_instrumento_inicial(4) == c.get_instrumento_inicial(0)
 
 
 def test_alteracao_do_usuario_aparece_em_criar_parametros():
-    pytest.skip("TODO")
+    c = ConfiguracaoInicial.padrao()
+    c.set_instrumento_inicial(1, 40)
+    assert c.criar_parametros(1).get_instrumento() == 40
 
 
 # ---- Partitura ----------------------------------------------------------
@@ -103,12 +120,47 @@ def test_alteracao_do_usuario_aparece_em_criar_parametros():
 def test_bpm_em_acumula_mudancas_anteriores_a_posicao():
     """bpm_inicial 120; +10 em 4 beats; -10 em 8 beats.
     bpm_em(0)=120, bpm_em(5)=130, bpm_em(9)=120."""
-    pytest.skip("TODO")
+    p = Partitura(bpm_inicial=120)
+    p.registrar_mudanca_andamento(8, -10)  # fora de ordem de propósito
+    p.registrar_mudanca_andamento(4, +10)
+    assert p.bpm_em(0) == 120
+    assert p.bpm_em(5) == 130
+    assert p.bpm_em(9) == 120
+
+
+def test_catalogo_tem_pelo_menos_25():
+    assert len(CatalogoInstrumentos.padrao().listar()) >= 25
+
+
+def test_catalogo_tem_os_obrigatorios():
+    catalogo = CatalogoInstrumentos.padrao()
+    obrigatorios = [
+        instrumentos.PIANO,
+        instrumentos.CRAVO,
+        instrumentos.TUBULAR_BELLS,
+        instrumentos.ORGAO_DE_IGREJA,
+        instrumentos.BANDONEON,
+        instrumentos.CORDAS,
+        instrumentos.FAGOTE,
+        instrumentos.GAITA_DE_FOLES,
+        instrumentos.AGOGO,
+    ]
+    for programa in obrigatorios:
+        assert catalogo.contem(programa)
 
 
 def test_bpm_em_respeita_limites():
-    pytest.skip("TODO")
+    p = Partitura(bpm_inicial=295)
+    p.registrar_mudanca_andamento(1, +10)
+    p.registrar_mudanca_andamento(2, +10)
+    assert p.bpm_em(3) == 300
 
 
 def test_duracao_total_considera_atraso():
-    pytest.skip("TODO")
+    # Supõe semínima = 1 beat: atraso de 4 + uma semínima = 5 beats.
+    voz = Voz(0, ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=100))
+    voz.set_atraso(4)
+    voz.adicionar_evento(EventoMusical.criar_pausa(Duracao.SEMINIMA))
+    partitura = Partitura(bpm_inicial=120)
+    partitura.adicionar_voz(voz)
+    assert partitura.duracao_total_beats() == 5
