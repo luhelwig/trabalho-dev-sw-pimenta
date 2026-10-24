@@ -1,7 +1,12 @@
 """NOVA (Fase 2): valores iniciais da música, configuráveis pela interface."""
 
 from gerador_musical.musica.parametros_musica import ParametrosMusica
-
+from gerador_musical.musica.instrumentos import CRAVO, FAGOTE, ORGAO_DE_IGREJA, PIANO
+from gerador_musical.musica.limites import BPM_MAXIMO, BPM_MINIMO, OITAVA_MAXIMA, OITAVA_MINIMA, PROGRAMA_MIDI_MAXIMO, PROGRAMA_MIDI_MINIMO, VOLUME_MAXIMO, VOLUME_MINIMO
+BPM_PADRAO = 120
+INSTRUMENTOS_PADRAO = (CRAVO, ORGAO_DE_IGREJA, PIANO, FAGOTE)
+OITAVAS_PADRAO = (6, 5, 4, 3)
+VOLUMES_PADRAO = (100, 80, 60, 40)
 
 class ConfiguracaoInicial:
     """Valores com que a música começa: BPM global + padrões por voz.
@@ -23,56 +28,74 @@ class ConfiguracaoInicial:
 
     def __init__(self, bpm_inicial: int) -> None:
         self.bpm_inicial: int = bpm_inicial
-        # TODO: preencher com a tabela acima (um valor por voz do ciclo).
         self._instrumentos: list[int] = []
         self._oitavas: list[int] = []
         self._volumes: list[int] = []
+        self._carregar_padroes()
+
+    def _carregar_padroes(self) -> None:
+        """Copia os valores padrão dos requisitos para as listas por voz."""
+        self._instrumentos = list(INSTRUMENTOS_PADRAO)
+        self._oitavas = list(OITAVAS_PADRAO)
+        self._volumes = list(VOLUMES_PADRAO)
+
+    @staticmethod
+    def _validar(valor: int, minimo: int, maximo: int, nome: str) -> None:
+        """Levanta ValueError se o valor estiver fora de [minimo, maximo]."""
+        if not minimo <= valor <= maximo:
+            raise ValueError(f"{nome} fora de {minimo}–{maximo}: {valor}")
 
     @classmethod
     def padrao(cls) -> "ConfiguracaoInicial":
         """Configuração com os valores padrão dos requisitos.
-
-        TODO (decisão do grupo): BPM inicial padrão (ex.: 120).
         """
-        raise NotImplementedError
+        return cls(BPM_PADRAO)
 
     # ---- BPM (global) ---------------------------------------------------
 
     def get_bpm_inicial(self) -> int:
-        raise NotImplementedError
+        return self.bpm_inicial
 
     def set_bpm_inicial(self, bpm: int) -> None:
         """Raises: ValueError fora de [BPM_MINIMO, BPM_MAXIMO]."""
-        raise NotImplementedError
+        self._validar(bpm, BPM_MINIMO, BPM_MAXIMO, "BPM")
+        self.bpm_inicial = bpm
 
     # ---- Por voz --------------------------------------------------------
 
     def get_instrumento_inicial(self, indice_voz: int) -> int:
         """Instrumento inicial da voz, ciclando a cada TAMANHO_DO_CICLO vozes."""
-        raise NotImplementedError
+        return self._instrumentos[self._indice_no_ciclo(indice_voz)]
 
     def set_instrumento_inicial(self, indice_voz: int, programa: int) -> None:
-        raise NotImplementedError
+        self._validar(programa, PROGRAMA_MIDI_MINIMO, PROGRAMA_MIDI_MAXIMO, "Instrumento")
+        self._instrumentos[self._indice_no_ciclo(indice_voz)] = programa
 
     def get_oitava_inicial(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return self._oitavas[self._indice_no_ciclo(indice_voz)]
 
     def set_oitava_inicial(self, indice_voz: int, oitava: int) -> None:
-        raise NotImplementedError
+        self._validar(oitava, OITAVA_MINIMA, OITAVA_MAXIMA, "Oitava")
+        self._oitavas[self._indice_no_ciclo(indice_voz)] = oitava
 
     def get_volume_inicial(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return self._volumes[self._indice_no_ciclo(indice_voz)]
 
     def set_volume_inicial(self, indice_voz: int, volume: int) -> None:
-        raise NotImplementedError
+        self._validar(volume, VOLUME_MINIMO, VOLUME_MAXIMO, "Volume")
+        self._volumes[self._indice_no_ciclo(indice_voz)] = volume
 
     def criar_parametros(self, indice_voz: int) -> ParametrosMusica:
         """Fábrica: ParametrosMusica novo com os valores iniciais da voz."""
-        raise NotImplementedError
+        return ParametrosMusica(
+            self.get_instrumento_inicial(indice_voz),
+            self.get_oitava_inicial(indice_voz),
+            self.get_volume_inicial(indice_voz),
+        )
 
     def restaurar_padroes(self) -> None:
         """Desfaz as alterações feitas pelo usuário."""
-        raise NotImplementedError
+        self._carregar_padroes()
 
     def _indice_no_ciclo(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return indice_voz % self.TAMANHO_DO_CICLO

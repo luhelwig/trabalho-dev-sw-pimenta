@@ -5,6 +5,7 @@ porque oitava, volume e instrumento são próprios de cada linha.
 O BPM saiu daqui: ele é global (vive em ConfiguracaoInicial/Partitura).
 """
 
+from gerador_musical.musica.limites import OITAVA_MAXIMA, OITAVA_MINIMA, PROGRAMA_MIDI_MAXIMO, PROGRAMA_MIDI_MINIMO, VOLUME_MAXIMO
 
 class ParametrosMusica:
     """Estado mutável dos parâmetros de UMA voz durante a interpretação.
@@ -25,13 +26,13 @@ class ParametrosMusica:
 
     def dobrar_volume(self) -> None:
         """Dobra o volume; se passar de VOLUME_MAXIMO, fica no máximo."""
-        raise NotImplementedError
+        self.volume_atual = min((self.volume_atual * 2), VOLUME_MAXIMO)
 
     def reset_volume(self) -> None:
-        raise NotImplementedError
+        self.volume_atual = self.volume_padrao
 
     def get_volume(self) -> int:
-        raise NotImplementedError
+        return self.volume_atual
 
     # ---- Oitava ---------------------------------------------------------
 
@@ -41,7 +42,11 @@ class ParametrosMusica:
         Regra da Fase 1: se não puder subir (passa de OITAVA_MAXIMA),
         volta à oitava padrão da voz.
         """
-        raise NotImplementedError
+        if self.oitava_atual + 1 > OITAVA_MAXIMA:
+            self.reset_oitava()
+        else:
+            self.oitava_atual += 1
+
 
     def decrementar_oitava(self) -> None:
         """NOVO — comando 'V': desce uma oitava.
@@ -49,33 +54,36 @@ class ParametrosMusica:
         TODO (decisão do grupo): o que fazer abaixo de OITAVA_MINIMA
         (sugestão: simétrico ao incrementar — volta à padrão).
         """
-        raise NotImplementedError
+        if self.oitava_atual - 1 < OITAVA_MINIMA:
+            self.reset_oitava()
+        else:
+            self.oitava_atual -= 1
 
     def reset_oitava(self) -> None:
-        raise NotImplementedError
+        self.oitava_atual = self.oitava_padrao
 
     def get_oitava(self) -> int:
-        raise NotImplementedError
+        return self.oitava_atual
 
     # ---- Instrumento ----------------------------------------------------
 
     def set_instrumento(self, midi: int) -> None:
-        """Troca o instrumento atual (programa MIDI 0–127).
-
-        TODO (decisão do grupo): o que fazer com valor fora de 0–127
-        (ex.: regra do dígito par somando além de 127).
-        """
-        raise NotImplementedError
+        """Troca o instrumento atual (programa MIDI 0–127)."""
+        if midi < PROGRAMA_MIDI_MINIMO or midi > PROGRAMA_MIDI_MAXIMO:
+            raise ValueError(f"Instrumento fora de 0–127: {midi}")
+        self.instrumento_atual = midi
 
     def get_instrumento(self) -> int:
-        raise NotImplementedError
+        return self.instrumento_atual
 
     def reset_instrumento(self) -> None:
         """NOVO — volta ao instrumento inicial da voz."""
-        raise NotImplementedError
+        self.instrumento_atual = self.instrumento_inicial
 
     # ---- Geral ----------------------------------------------------------
 
     def resetar(self) -> None:
         """NOVO — volta volume, oitava e instrumento aos valores iniciais."""
-        raise NotImplementedError
+        self.reset_instrumento()
+        self.reset_oitava()
+        self.reset_volume()

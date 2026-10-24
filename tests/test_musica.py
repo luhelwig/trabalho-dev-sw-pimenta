@@ -4,6 +4,9 @@ ConfiguracaoInicial e Partitura."""
 import pytest
 from gerador_musical.musica.duracao import Duracao
 from gerador_musical.musica.nota_musical import NotaMusical, Acidente
+from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
+from gerador_musical.musica.instrumentos import CRAVO, FAGOTE, ORGAO_DE_IGREJA, PIANO, CatalogoInstrumentos
+from gerador_musical.musica.parametros_musica import ParametrosMusica
 
 # ---- Duracao / NotaMusical ---------------------------------------------
 
@@ -44,24 +47,38 @@ def test_sustenido_sobe_e_bemol_desce_um_semitom():
 
 def test_dobrar_volume():
     """40 -> 80."""
-    pytest.skip("TODO")
+    p = ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=40)
+    p.dobrar_volume()
+    assert p.get_volume() == 80
 
 
 def test_dobrar_volume_satura_em_127():
     """100 -> 127."""
-    pytest.skip("TODO")
+    p = ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=100)
+    p.dobrar_volume()
+    assert p.get_volume() == 127
 
 
 def test_incrementar_oitava_alem_do_maximo_volta_para_padrao():
-    pytest.skip("TODO")
+    p = ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=100)
+    for _ in range(4):
+        p.incrementar_oitava()
+    assert p.get_oitava() == 8
+    p.incrementar_oitava()
+    assert p.get_oitava() == 4
 
 
 def test_decrementar_oitava():
-    pytest.skip("TODO")
+    p = ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=100)
+    p.decrementar_oitava()
+    assert p.get_oitava() == 3
 
 
 def test_reset_instrumento_volta_ao_inicial():
-    pytest.skip("TODO")
+    p = ParametrosMusica(instrumento_inicial=0, oitava_padrao=4, volume_padrao=100)
+    p.set_instrumento(14)
+    p.reset_instrumento()
+    assert p.get_instrumento() == 0
 
 
 # ---- ConfiguracaoInicial ----------------------------------------------
