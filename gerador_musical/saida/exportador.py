@@ -2,6 +2,7 @@
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+from datetime import datetime
 
 import mido
 
@@ -28,11 +29,16 @@ class ExportadorMidi(Exportador):
         self.diretorio: Path | None = diretorio  # None = diretorio_padrao()
 
     def exportar(self, midi: mido.MidiFile, destino: Path | None = None) -> Path:
-        raise NotImplementedError
+        if destino is None:
+            pasta = self.diretorio or self.diretorio_padrao()
+            destino = pasta / self.gerar_nome_padrao()
+        destino.parent.mkdir(parents=True, exist_ok=True)
+        midi.save(str(destino))
+        return destino
 
     def diretorio_padrao(self) -> Path:
         """~/Downloads (criar se não existir?)."""
-        raise NotImplementedError
+        return Path.home() / "Downloads"
 
     def gerar_nome_padrao(self) -> str:
-        raise NotImplementedError
+        return datetime.now().strftime("musica_%Y%m%d_%H%M%S") + self.EXTENSAO
