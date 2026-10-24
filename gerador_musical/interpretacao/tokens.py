@@ -27,8 +27,8 @@ class Token:
     valor: int | None = None     # usado pelo ATRASO
 
     def eh_nota(self) -> bool:
-        raise NotImplementedError
+        return self.tipo is TipoToken.NOTA
 
     def eh_caractere(self, caractere: str) -> bool:
         """True se for CARACTERE e o lexema for exatamente `caractere`."""
-        raise NotImplementedError
+        return self.tipo is TipoToken.CARACTERE and self.lexema == caractere
