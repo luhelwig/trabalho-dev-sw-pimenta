@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 
 from gerador_musical.interpretacao.contexto import ContextoInterpretacao
-from gerador_musical.interpretacao.tokens import Token
+from gerador_musical.interpretacao.tokens import TipoToken, Token
 
 
 class RegraMapeamento(ABC):
@@ -30,4 +30,4 @@ class RegraPorCaractere(RegraMapeamento, ABC):
 
     def aceita(self, token: Token) -> bool:
         """True se o token é CARACTERE e está em self.caracteres."""
-        raise NotImplementedError
+        return token.tipo is TipoToken.CARACTERE and token.lexema in self.caracteres

@@ -17,4 +17,4 @@ class RegraAndamento(RegraPorCaractere):
         self.delta_bpm: int = delta_bpm
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        contexto.partitura.registrar_mudanca_andamento(contexto.posicao_atual_beats(), self.delta_bpm)

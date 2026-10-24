@@ -23,23 +23,25 @@ class ContextoInterpretacao:
 
     def parametros(self) -> ParametrosMusica:
         """Atalho para os parâmetros da voz atual."""
-        raise NotImplementedError
+        return self.voz.parametros
 
     def registrar_evento(self, evento: EventoMusical) -> None:
         """Adiciona o evento na voz e, se for nota, atualiza nota_anterior."""
-        raise NotImplementedError
+        self.voz.adicionar_evento(evento)
+        if evento.eh_nota() == True:
+            self.nota_anterior = evento
 
     def anterior_foi_nota(self) -> bool:
         """True se o token processado imediatamente antes era uma nota.
 
-        TODO (decisão do grupo): espaço entre notas ("C:3 H") conta como
+
         "anterior"? Se sim, H vira pausa; se não, repete C.
         """
-        raise NotImplementedError
+        return self.token_anterior is not None and self.token_anterior.eh_nota()
 
     def avancar(self, token: Token) -> None:
         """Chamado pelo Parser depois de cada regra: token atual vira anterior."""
-        raise NotImplementedError
+        self.token_anterior = token
 
     def posicao_atual_beats(self) -> float:
-        raise NotImplementedError
+        return self.voz.posicao_atual_beats()

@@ -5,17 +5,18 @@ from gerador_musical.interpretacao.regras.regra_mapeamento import (
     RegraMapeamento,
     RegraPorCaractere,
 )
-from gerador_musical.interpretacao.tokens import Token
+from gerador_musical.interpretacao.tokens import TipoToken, Token
+from gerador_musical.musica.limites import PROGRAMA_MIDI_MAXIMO
 
 
 class RegraAtraso(RegraMapeamento):
     """Token ATRASO "[n]" -> a voz começa após n beats de silêncio."""
 
     def aceita(self, token: Token) -> bool:
-        raise NotImplementedError
+        return token.tipo is TipoToken.ATRASO
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        contexto.voz.set_atraso(token.valor)
 
 
 class RegraVolume(RegraPorCaractere):
@@ -31,7 +32,7 @@ class RegraVolume(RegraPorCaractere):
         super().__init__(caracteres)
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        contexto.parametros().dobrar_volume()
 
 
 class RegraOitava(RegraPorCaractere):
@@ -46,8 +47,10 @@ class RegraOitava(RegraPorCaractere):
         self.sentido: int = sentido
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
-
+        if self.sentido > 0:
+            contexto.parametros().incrementar_oitava()
+        else:
+            contexto.parametros().decrementar_oitava()
 
 class RegraInstrumentoFixo(RegraPorCaractere):
     """Troca para um instrumento específico.
@@ -61,7 +64,7 @@ class RegraInstrumentoFixo(RegraPorCaractere):
         self.programa: int = programa
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        contexto.parametros().set_instrumento(self.programa)
 
 
 class RegraInstrumentoSomaDigito(RegraPorCaractere):
@@ -75,4 +78,6 @@ class RegraInstrumentoSomaDigito(RegraPorCaractere):
         super().__init__(caracteres)
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        p= contexto.parametros()
+        novo = (p.get_instrumento() + int(token.lexema))% (PROGRAMA_MIDI_MAXIMO + 1)
+        p.set_instrumento(novo)

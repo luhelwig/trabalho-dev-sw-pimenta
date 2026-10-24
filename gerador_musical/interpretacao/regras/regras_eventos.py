@@ -6,7 +6,8 @@ from gerador_musical.interpretacao.regras.regra_mapeamento import (
     RegraPorCaractere,
 )
 from gerador_musical.interpretacao.tokens import Token
-
+from gerador_musical.musica.duracao import Duracao
+from gerador_musical.musica.evento_musical import EventoMusical
 
 class RegraNota(RegraMapeamento):
     """Token NOTA ("A", "C#:3", "Eb:2") -> evento de nota.
@@ -15,10 +16,11 @@ class RegraNota(RegraMapeamento):
     """
 
     def aceita(self, token: Token) -> bool:
-        raise NotImplementedError
+        return token.eh_nota()
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        duracao = token.duracao or Duracao.padrao()
+        contexto.registrar_evento(EventoMusical.criar_nota(token.nota, duracao, contexto.parametros()))
 
 
 class RegraPausa(RegraPorCaractere):
@@ -32,7 +34,7 @@ class RegraPausa(RegraPorCaractere):
         super().__init__(caracteres)
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        contexto.registrar_evento(EventoMusical.criar_pausa(Duracao.padrao()))
 
 
 class RegraRepetirOuPausar(RegraMapeamento):
@@ -47,7 +49,14 @@ class RegraRepetirOuPausar(RegraMapeamento):
     """
 
     def aceita(self, token: Token) -> bool:
-        raise NotImplementedError
+        return True
 
     def aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
-        raise NotImplementedError
+        if contexto.anterior_foi_nota() and contexto.nota_anterior is not None:
+            evento = EventoMusical.criar_nota(
+                contexto.nota_anterior.nota, contexto.nota_anterior.duracao, contexto.parametros()
+            )
+        else:
+            evento = EventoMusical.criar_pausa(Duracao.padrao())
+        contexto.registrar_evento(evento)
+
