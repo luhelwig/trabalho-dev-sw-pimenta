@@ -1,6 +1,7 @@
 """NOVA (Fase 2): leitura e gravação de arquivos .txt (Mudança 1)."""
 
 from pathlib import Path
+from gerador_musical.excecoes import ArquivoInvalidoErro
 
 
 class ArquivoTexto:
@@ -21,12 +22,17 @@ class ArquivoTexto:
             ArquivoInvalidoErro: arquivo inexistente, sem extensão .txt
                 ou que não pode ser decodificado.
         """
-        raise NotImplementedError
+        if not self.eh_arquivo_txt(caminho):
+            raise ArquivoInvalidoErro(f"Não é um arquivo .txt válido: {caminho}")
+        try:
+            return caminho.read_text(encoding=self.CODIFICACAO)
+        except UnicodeDecodeError:
+            return caminho.read_text(encoding="latin-1")
 
     def salvar(self, caminho: Path, conteudo: str) -> None:
         """Grava `conteudo` em `caminho`, substituindo o arquivo existente."""
-        raise NotImplementedError
+        caminho.write_text(conteudo, encoding=self.CODIFICACAO)
 
     def eh_arquivo_txt(self, caminho: Path) -> bool:
         """True se o caminho existe, é arquivo e tem extensão .txt."""
-        raise NotImplementedError
+        return caminho.is_file() and caminho.suffix.lower() == self.EXTENSAO_ACEITA
