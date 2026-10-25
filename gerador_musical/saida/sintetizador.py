@@ -66,6 +66,8 @@ class Sintetizador:
             trilha.append(note_on.copy(time=espera))
             trilha.append(note_off)
             espera = 0
+        if espera > 0:  # pausas no fim da voz: segura o fim da trilha
+            trilha.append(mido.MetaMessage("end_of_track", time=espera))
         return trilha
 
     def gerar_mensagens(self, evento: EventoMusical, canal: int) -> list[mido.Message]:

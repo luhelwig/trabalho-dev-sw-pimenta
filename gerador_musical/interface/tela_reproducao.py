@@ -3,50 +3,151 @@
 from __future__ import annotations
 
 import tkinter as tk
+from pathlib import Path
+from tkinter import filedialog
 from typing import TYPE_CHECKING
+
+from gerador_musical.excecoes import GeradorMusicalErro
+from gerador_musical.interface import estilo
 
 if TYPE_CHECKING:
     from gerador_musical.interface.app import App
 
 
 class TelaReproducao(tk.Frame):
-    """Só aparece depois de gerar com sucesso.
+    """Frame "Gerador de musica" do Figma. Só aparece depois de gerar.
 
-    Layout (croqui): mensagem "música gerada!", botão "tocar", grupo de
-    exportação ("baixar MIDI"), botão "voltar" (ajustar parâmetros e
-    gerar de novo sem redigitar o texto).
+    Layout: "música gerada!", botão "baixar midi" (vai para Downloads),
+    pílula "salvar como..." (escolher onde), botão de play e "voltar"
+    (ajustar parâmetros e gerar de novo sem redigitar o texto).
 
-    NOVO: "pausar/retomar" e "parar" (requisito de interromper e retomar)
-    e aviso de conclusão quando a música termina.
+    NOVO na Fase 2 (requisito de interromper e retomar): o play vira
+    pausar/retomar enquanto toca, pílula "parar", estado no canto
+    ("tocando...", "pausada", "fim") e aviso quando a música termina.
     """
 
     INTERVALO_VERIFICACAO_MS = 200
+    LARGURA, ALTURA = 813, 586
+    TAG_ICONE_PLAY = "icone_play"
 
     def __init__(self, app: App) -> None:
-        super().__init__(app)
+        super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
+        self.desenho: estilo.Desenho | None = None
+        self._tocando: bool = False
+        self._pausado: bool = False
 
     def construir(self) -> None:
-        raise NotImplementedError
+        d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
+        d.pack()
+        d.retangulo(24, 21, 764, 545, 57, estilo.CARTAO)
+        d.texto(406, 21, "gerador de música", estilo.TITULO, ancora="n")
+        d.texto(55, 153, "música gerada!")
+        self.rotulo_estado = d.texto(757, 160, "", 50, cor=estilo.FUNDO, ancora="ne")
+        d.retangulo(49, 234, 715, 298, 25, estilo.PAINEL)
+
+        d.botao(66, 261, 265, 76, "baixar midi", self._ao_baixar_midi)
+        d.botao(74, 361, 324, 47, "salvar como...", self._ao_salvar_midi_como, cor=estilo.FUNDO, raio=23)
+
+        # círculo e pílula fazem a mesma coisa: tocar / pausar / retomar
+        self._tag_play = d.nova_tag()
+        d.circulo(74, 435, 70, estilo.ESCURO, tags=self._tag_play)
+        d.tornar_clicavel(self._tag_play, self._ao_tocar_ou_pausar)
+        _, self.rotulo_play = d.botao(163, 439, 180, 58, "", self._ao_tocar_ou_pausar, cor=estilo.FUNDO, raio=29)
+        d.botao(357, 439, 130, 58, "parar", self._ao_parar, cor=estilo.FUNDO, raio=29)
+
+        d.botao(581, 433, 158, 76, "voltar", self._ao_voltar)
+        self._mostrar_estado("pronta para tocar")
+
+    # ---- Eventos --------------------------------------------------------
+
+    def _ao_tocar_ou_pausar(self) -> None:
+        """Parada -> toca; tocando -> pausa; pausada -> retoma."""
+        if self._tocando:
+            self._ao_pausar_ou_retomar()
+        else:
+            self._ao_tocar()
 
     def _ao_tocar(self) -> None:
-        """Toca e agenda _verificar_fim com app.after(...)."""
-        raise NotImplementedError
+        """Toca e agenda _verificar_fim com after(...)."""
+        try:
+            self.app.controlador.tocar()
+        except GeradorMusicalErro as erro:
+            self.app.mostrar_erro(str(erro))
+            return
+        ja_estava_verificando = self._tocando
+        self._tocando = True
+        self._pausado = False
+        self._mostrar_estado("tocando...")
+        if not ja_estava_verificando:           # evita duas verificações em paralelo
+            self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
 
     def _ao_pausar_ou_retomar(self) -> None:
-        raise NotImplementedError
+        if not self._tocando:
+            return
+        if self._pausado:
+            self.app.controlador.retomar()
+        else:
+            self.app.controlador.pausar()
+        self._pausado = not self._pausado
+        self._mostrar_estado("pausada" if self._pausado else "tocando...")
 
     def _ao_parar(self) -> None:
-        raise NotImplementedError
+        self.app.controlador.parar()
+        self._tocando = False
+        self._pausado = False
+        self._mostrar_estado("parada")
 
     def _ao_baixar_midi(self) -> None:
-        """controlador.exportar_midi() e mostrar onde o arquivo foi salvo."""
-        raise NotImplementedError
+        """Salva em Downloads com o nome padrão."""
+        self._exportar_midi(None)
+
+    def _ao_salvar_midi_como(self) -> None:
+        """Deixa o usuário escolher pasta e nome."""
+        nome = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI", "*.mid")])
+        if not nome:                            # usuário cancelou
+            return
+        self._exportar_midi(Path(nome))
+
+    def _exportar_midi(self, destino: Path | None) -> None:
+        try:
+            caminho = self.app.controlador.exportar_midi(destino)
+        except GeradorMusicalErro as erro:
+            self.app.mostrar_erro(str(erro))
+            return
+        self.app.mostrar_info(f"MIDI salvo em {caminho}")
 
     def _ao_voltar(self) -> None:
-        raise NotImplementedError
+        self._ao_parar()
+        self._mostrar_estado("pronta para tocar")
+        self.app.mostrar_tela("principal")
 
     def _verificar_fim(self) -> None:
         """Se a música terminou, mostra a mensagem de conclusão;
         senão, reagenda a si mesmo (não bloqueia a interface)."""
-        raise NotImplementedError
+        if not self._tocando:
+            return
+        if self.app.controlador.reproducao_terminou():
+            self._ao_parar()
+            self._mostrar_estado("fim")
+            self.app.mostrar_info("Fim da música.")
+        else:
+            self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
+
+    # ---- Aparência ------------------------------------------------------
+
+    def _mostrar_estado(self, texto: str) -> None:
+        """Escreve o estado no canto e troca ícone/texto do botão de play."""
+        d = self.desenho
+        d.itemconfig(self.rotulo_estado, text=texto)
+        tocando_agora = self._tocando and not self._pausado
+        if tocando_agora:
+            acao = "pausar"
+        elif self._pausado:
+            acao = "retomar"
+        else:
+            acao = "tocar"
+        d.itemconfig(self.rotulo_play, text=acao)
+        d.delete(self.TAG_ICONE_PLAY)
+        d.icone("pausar" if tocando_agora else "tocar", 81, 442, 55, 55, estilo.PAINEL,
+                tags=(self._tag_play, self.TAG_ICONE_PLAY))

@@ -6,6 +6,7 @@ from gerador_musical.entrada.entrada_usuario import EntradaUsuario
 from gerador_musical.interpretacao.parser import Parser
 from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
 from gerador_musical.musica.instrumentos import CatalogoInstrumentos, Instrumento
+from gerador_musical.musica.partitura import Partitura
 from gerador_musical.saida.exportador import Exportador
 from gerador_musical.saida.player import Player
 from gerador_musical.saida.sintetizador import Sintetizador
