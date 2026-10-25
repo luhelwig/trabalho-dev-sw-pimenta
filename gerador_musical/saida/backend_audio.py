@@ -6,6 +6,7 @@ passa-se um backend falso que só registra as chamadas.
 
 from abc import ABC, abstractmethod
 from pathlib import Path
+import pygame
 
 
 class BackendAudio(ABC):
@@ -40,22 +41,32 @@ class BackendPygame(BackendAudio):
 
     def _garantir_inicializado(self) -> None:
         """pygame.mixer.init() uma única vez."""
-        raise NotImplementedError
+        if not self._inicializado:
+            pygame.mixer.init()
+            self._inicializado = True
 
     def carregar(self, arquivo_midi: Path) -> None:
-        raise NotImplementedError
+        self._garantir_inicializado()
+        pygame.mixer.music.load(str(arquivo_midi))
 
     def tocar(self) -> None:
-        raise NotImplementedError
+        pygame.mixer.music.play()
 
     def pausar(self) -> None:
-        raise NotImplementedError
+        pygame.mixer.music.pause()
 
     def retomar(self) -> None:
-        raise NotImplementedError
+        pygame.mixer.music.unpause()
 
     def parar(self) -> None:
-        raise NotImplementedError
+        if not self._inicializado:
+            return
+        else:
+            pygame.mixer.music.stop()
+            pygame.mixer.music.unload()
 
     def esta_tocando(self) -> bool:
-        raise NotImplementedError
+        if not self._inicializado:
+            return False
+        else:
+            return pygame.mixer.music.get_busy()

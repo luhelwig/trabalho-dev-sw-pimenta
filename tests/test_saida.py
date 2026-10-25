@@ -6,6 +6,7 @@ backend falso que só anota o que foi chamado, então rodam sem som.
 
 import mido
 import pytest
+import pygame
 
 from gerador_musical.excecoes import MusicaNaoGeradaErro
 from gerador_musical.interpretacao.parser import Parser

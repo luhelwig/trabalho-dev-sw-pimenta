@@ -9,6 +9,7 @@ from gerador_musical.musica.instrumentos import CatalogoInstrumentos, Instrument
 from gerador_musical.saida.exportador import Exportador
 from gerador_musical.saida.player import Player
 from gerador_musical.saida.sintetizador import Sintetizador
+from gerador_musical.excecoes import FormatoInvalidoErro, MusicaNaoGeradaErro, TextoVazioErro
 
 
 class ControladorAplicacao:
@@ -39,26 +40,29 @@ class ControladorAplicacao:
         self._player = player
         self._exportador = exportador
         self._catalogo = catalogo
-
+        self._musica = None
     # ---- Texto ----------------------------------------------------------
 
     def atualizar_texto(self, texto: str) -> None:
-        raise NotImplementedError
+        self._entrada.set_conteudo(texto)
 
     def carregar_arquivo(self, caminho: Path) -> str:
         """Carrega o .txt e devolve o texto para a tela exibir no campo."""
-        raise NotImplementedError
+        self._entrada.carregar_arquivo(caminho)
+        return self._entrada.get_conteudo()
 
     def salvar_texto(self, caminho: Path | None = None) -> Path:
         """Salva o texto (sobrescreve o original se veio de arquivo)."""
-        raise NotImplementedError
+        return self._entrada.salvar_arquivo(caminho)
 
     def texto_veio_de_arquivo(self) -> bool:
-        raise NotImplementedError
+        return self._entrada.veio_de_arquivo()
 
     def limpar(self) -> None:
         """Nova composição: para a música, esvazia o texto e a partitura."""
-        raise NotImplementedError
+        self._player.stop()
+        self._entrada.limpar()
+        self._musica = None
 
     # ---- Geração --------------------------------------------------------
 
@@ -68,64 +72,78 @@ class ControladorAplicacao:
         Raises:
             TextoVazioErro, FormatoInvalidoErro
         """
-        raise NotImplementedError
+        if self._entrada.esta_vazio():
+            raise TextoVazioErro("texto vazio")
+        if not self._entrada.eh_formato_valido():
+            raise FormatoInvalidoErro("formato incorreto")
+        partitura = self._parser.interpretar(self._entrada.get_conteudo())
+        self._sintetizar_e_carregar(partitura)
 
     def regerar_com_novos_parametros(self) -> None:
         """Usa os tokens já lidos (Parser.token_to_partitura), sem
         reinterpretar o texto, aplicando a ConfiguracaoInicial atual."""
-        raise NotImplementedError
+        partitura = self._parser.token_to_partitura()
+        self._sintetizar_e_carregar(partitura)
 
     def musica_foi_gerada(self) -> bool:
-        raise NotImplementedError
+        return self._musica is not None
 
+    def _sintetizar_e_carregar(self, partitura: Partitura) -> None:
+        """Parte comum de gerar e regerar: Partitura -> MIDI -> Player."""
+        self._musica = self._sintetizador.gerar_musica(partitura)
+        self._player.carregar(self._musica)
     # ---- Reprodução -----------------------------------------------------
 
     def tocar(self) -> None:
-        raise NotImplementedError
+        self._player.play()
 
     def pausar(self) -> None:
-        raise NotImplementedError
+        self._player.pausar()
 
     def retomar(self) -> None:
-        raise NotImplementedError
+        self._player.retomar()
 
     def parar(self) -> None:
-        raise NotImplementedError
+        self._player.stop()
 
     def reproducao_terminou(self) -> bool:
-        raise NotImplementedError
+        return self._player.terminou()
 
     # ---- Exportação -----------------------------------------------------
 
     def exportar_midi(self, destino: Path | None = None) -> Path:
         """Raises: MusicaNaoGeradaErro"""
-        raise NotImplementedError
+        if self._musica is None:
+            raise MusicaNaoGeradaErro("Gere a música antes de salvar.")
+        return self._exportador.exportar(self._musica, destino)
 
     # ---- Configuração (bloco de parâmetros da tela principal) -----------
 
     def listar_instrumentos(self) -> list[Instrumento]:
-        raise NotImplementedError
+        return self._catalogo.listar()
 
     def get_bpm(self) -> int:
-        raise NotImplementedError
+        return self._configuracao.get_bpm_inicial()
 
     def set_bpm(self, bpm: int) -> None:
-        raise NotImplementedError
+        self._configuracao.set_bpm_inicial(bpm)
+
 
     def get_instrumento_voz(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return self._configuracao.get_instrumento_inicial(indice_voz)
+
 
     def set_instrumento_voz(self, indice_voz: int, programa: int) -> None:
-        raise NotImplementedError
+        self._configuracao.set_instrumento_inicial(indice_voz, programa)
 
     def get_oitava_voz(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return self._configuracao.get_oitava_inicial(indice_voz)
 
     def set_oitava_voz(self, indice_voz: int, oitava: int) -> None:
-        raise NotImplementedError
+        self._configuracao.set_oitava_inicial(indice_voz, oitava)
 
     def get_volume_voz(self, indice_voz: int) -> int:
-        raise NotImplementedError
+        return self._configuracao.get_volume_inicial(indice_voz)
 
     def set_volume_voz(self, indice_voz: int, volume: int) -> None:
-        raise NotImplementedError
+        self._configuracao.set_volume_inicial(indice_voz, volume)

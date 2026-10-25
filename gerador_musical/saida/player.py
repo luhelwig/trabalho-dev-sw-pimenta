@@ -1,8 +1,9 @@
 """Classe Player (Fase 1, adaptada na Fase 2)."""
 
 from pathlib import Path
-
+import tempfile
 import mido
+from gerador_musical.excecoes import MusicaNaoGeradaErro
 
 from gerador_musical.saida.backend_audio import BackendAudio
 
@@ -28,7 +29,10 @@ class Player:
         pygame toca a partir de arquivo: salvar `musica` num arquivo
         temporário (tempfile) e passar o caminho ao backend.
         """
-        raise NotImplementedError
+        self.stop()  # solta o arquivo anterior, se houver
+        self.musica = musica
+        self._arquivo_temporario = Path(tempfile.gettempdir()) / "gerador_musical.mid"
+        musica.save(str(self._arquivo_temporario))
 
     def play(self) -> None:
         """Toca do início.
@@ -36,18 +40,30 @@ class Player:
         Raises:
             MusicaNaoGeradaErro: nada carregado.
         """
-        raise NotImplementedError
+        if self.musica is None:
+            raise MusicaNaoGeradaErro("Gere a música antes de tocar.")
+        self._backend.carregar(self._arquivo_temporario)
+        self._backend.tocar()
+        self.em_reproducao = True
+        self.pausado = False
 
     def stop(self) -> None:
-        raise NotImplementedError
+        self._backend.parar()
+        self.em_reproducao = False
+        self.pausado = False
 
     def pausar(self) -> None:
-        raise NotImplementedError
+        if self.em_reproducao and not self.pausado:
+            self._backend.pausar()
+            self.pausado = True
+
 
     def retomar(self) -> None:
-        raise NotImplementedError
+        if self.em_reproducao and self.pausado:
+            self._backend.retomar()
+            self.pausado = False
 
     def terminou(self) -> bool:
         """NOVO — True quando a música acabou sozinha (para a mensagem de
         conclusão). A interface consulta isto periodicamente (tk.after)."""
-        raise NotImplementedError
+        return self.em_reproducao and not self.pausado and not self._backend.esta_tocando()
