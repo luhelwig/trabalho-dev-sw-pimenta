@@ -1,7 +1,10 @@
-"""Ponto de entrada: monta as dependências e abre a interface.
+"""Ponto de entrada do Gerador de Música a partir de Texto.
 
-Este é o único lugar que conhece as classes concretas de tudo
-("composition root"). O resto do código recebe as dependências prontas.
+Monta todas as dependências e abre a interface. Este é o único lugar que
+conhece as classes concretas de tudo (a "composition root"); o resto do
+código recebe as dependências prontas pelo construtor.
+
+Para rodar: python main.py
 """
 
 from gerador_musical.aplicacao.controlador import ControladorAplicacao
@@ -19,10 +22,17 @@ from gerador_musical.saida.sintetizador import Sintetizador
 
 
 def criar_controlador() -> ControladorAplicacao:
-    """Instancia e conecta: CatalogoInstrumentos.padrao(),
-    ConfiguracaoInicial.padrao(), Tokenizador, Mapeamento.padrao(catalogo),
-    Parser, EntradaUsuario, Sintetizador, Player(BackendPygame()),
-    ExportadorMidi -> ControladorAplicacao."""
+    """Instancia e conecta todas as peças do sistema.
+
+    Cria o catálogo de instrumentos, a configuração inicial, o Parser (com
+    Tokenizador e Mapeamento.padrao()), a entrada do usuário, o
+    Sintetizador, o Player (com BackendPygame) e o ExportadorMidi. A mesma
+    ConfiguracaoInicial vai para o Parser e para o controlador: assim, o
+    que a tela muda pelo controlador é visto pelo Parser.
+
+    Returns:
+        O ControladorAplicacao pronto para ser usado pela interface.
+    """
     catalogo = CatalogoInstrumentos.padrao()
     configuracao = ConfiguracaoInicial.padrao()
     parser = Parser(Tokenizador(), Mapeamento.padrao(), configuracao)
@@ -34,6 +44,7 @@ def criar_controlador() -> ControladorAplicacao:
 
 
 def main() -> None:
+    """Cria a janela, monta as telas e entra no laço de eventos do tkinter."""
     app = App(criar_controlador())
     app.construir()
     app.mainloop()

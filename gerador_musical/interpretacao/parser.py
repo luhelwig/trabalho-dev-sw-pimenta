@@ -13,15 +13,18 @@ class Parser:
     """Transforma o texto em Partitura.
 
     Duas etapas separadas (já existiam na Fase 1):
-      1. texto_to_token: texto -> tokens de cada linha (só sintaxe)
-      2. token_to_partitura: tokens -> Partitura (aplica o Mapeamento)
+      1. texto_to_token: texto -> tokens de cada linha (só sintaxe);
+      2. token_to_partitura: tokens -> Partitura (aplica o Mapeamento).
 
     Guardar os tokens permite atender "alterar parâmetros e reproduzir de
-    novo sem reinterpretar o texto": muda a ConfiguracaoInicial e chama
-    só a etapa 2.
+    novo sem reinterpretar o texto": muda-se a ConfiguracaoInicial e chama-se
+    só a etapa 2. O Parser não conhece nenhuma regra específica; quem decide
+    o que cada token faz é o Mapeamento (Aberto/Fechado).
 
-    O Parser não conhece nenhuma regra específica: quem decide o que cada
-    token faz é o Mapeamento (aberto/fechado).
+    Attributes:
+        texto: último texto interpretado.
+        tokens: uma lista de tokens por linha (voz).
+        partitura: última Partitura gerada.
     """
 
     def __init__(
@@ -30,6 +33,13 @@ class Parser:
         mapeamento: Mapeamento,
         configuracao: ConfiguracaoInicial,
     ) -> None:
+        """Recebe as dependências prontas (injeção de dependência).
+
+        Args:
+            tokenizador: quem quebra cada linha em tokens.
+            mapeamento: quem escolhe a regra de cada token.
+            configuracao: valores iniciais (BPM e padrões por voz).
+        """
         self.texto: str = ""
         self.tokens: list[list[Token]] = []  # uma lista de tokens por linha/voz
         self.partitura: Partitura | None = None
@@ -38,21 +48,42 @@ class Parser:
         self._configuracao = configuracao
 
     def interpretar(self, texto: str) -> Partitura:
-        """NOVO — atalho: texto_to_token + token_to_partitura."""
+        """NOVO — atalho: texto_to_token seguido de token_to_partitura.
+
+        Args:
+            texto: texto completo (uma voz por linha).
+
+        Returns:
+            A Partitura da música.
+        """
         self.texto_to_token(texto)
         return self.token_to_partitura()
 
     def texto_to_token(self, texto: str) -> list[list[Token]]:
-        """Separa o texto em linhas e tokeniza cada uma. Guarda em self.tokens."""
+        """Separa o texto em linhas e tokeniza cada uma. Guarda em self.tokens.
+
+        Args:
+            texto: texto completo.
+
+        Returns:
+            Uma lista de tokens por linha.
+        """
         self.texto = texto
         self.tokens = [self._tokenizador.tokenizar(linha) for linha in self._separar_linhas(texto)]
         return self.tokens
 
     def token_to_partitura(self, tokens: list[list[Token]] | None = None) -> Partitura:
-        """Monta a Partitura a partir dos tokens (padrão: self.tokens).
+        """Monta a Partitura a partir dos tokens.
 
-        Cria uma Voz por linha com os parâmetros iniciais vindos de
-        ConfiguracaoInicial.criar_parametros(indice).
+        Cria uma Voz por linha, com os parâmetros iniciais vindos de
+        ConfiguracaoInicial.criar_parametros(indice), e aplica o Mapeamento a
+        cada token.
+
+        Args:
+            tokens: tokens por linha; None para usar os guardados em self.tokens.
+
+        Returns:
+            A Partitura gerada (também guardada em self.partitura).
         """
         if tokens is None:
             tokens = self.tokens
@@ -63,16 +94,31 @@ class Parser:
         return partitura
 
     def _separar_linhas(self, texto: str) -> list[str]:
-        """Quebra em linhas (aceitar '\\n' e '\\r\\n').
+        r"""Quebra o texto em linhas, aceitando '\n' e '\r\n'.
 
-        TODO (decisão do grupo): linha em branco vira voz silenciosa
-        (mantém a numeração V0, V1...) ou é descartada? E linhas além de 4:
-        ciclam (requisitos) ou são recusadas ("NESTE TRABALHO, 4 vozes")?
+        Decisões do grupo: linha em branco vira voz em silêncio (mantém a
+        numeração V0, V1...) e linhas além da quarta são aceitas, com os padrões
+        se repetindo em ciclo.
+
+        Args:
+            texto: texto completo.
+
+        Returns:
+            As linhas, sem as quebras.
         """
         return texto.splitlines()
 
     def _interpretar_linha(self, indice: int, tokens: list[Token], partitura: Partitura) -> Voz:
-        """Aplica o mapeamento a cada token de uma linha e devolve a Voz."""
+        """Aplica o mapeamento a cada token de uma linha e devolve a Voz.
+
+        Args:
+            indice: número da linha (voz).
+            tokens: tokens da linha.
+            partitura: partitura em construção.
+
+        Returns:
+            A voz montada.
+        """
         voz = Voz(indice, self._configuracao.criar_parametros(indice))
         contexto = ContextoInterpretacao(voz, partitura)
         for token in tokens:
@@ -80,5 +126,11 @@ class Parser:
         return voz
 
     def _aplicar(self, token: Token, contexto: ContextoInterpretacao) -> None:
+        """Aplica a regra do token e marca o token como anterior no contexto.
+
+        Args:
+            token: token a aplicar.
+            contexto: contexto da linha atual.
+        """
         self._mapeamento.aplicar(token, contexto)
         contexto.avancar(token)

@@ -1,4 +1,4 @@
-"""Testes de EntradaUsuario e ArquivoTexto (use o fixture tmp_path do pytest)."""
+"""Testes de EntradaUsuario e ArquivoTexto (usa a fixture tmp_path do pytest)."""
 
 import pytest
 from gerador_musical.entrada.entrada_usuario import EntradaUsuario

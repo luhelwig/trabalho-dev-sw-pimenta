@@ -1,4 +1,10 @@
-"""NOVA (Fase 2, Mudança 3): catálogo de instrumentos General MIDI."""
+"""NOVA (Fase 2, Mudança 3): catálogo de instrumentos General MIDI.
+
+As constantes (PIANO, CRAVO, TUBULAR_BELLS...) são números de programa
+MIDI de 0 a 127, que é o que o mido usa. Listas como a da Wikipédia
+numeram de 1 a 128; o enunciado mistura as duas numerações, e aqui tudo
+foi convertido para 0–127 (ex.: "Church Organ GM 20" = programa 19).
+"""
 
 from dataclasses import dataclass
 PIANO = 0
@@ -14,11 +20,11 @@ AGOGO = 113
 
 @dataclass(frozen=True)
 class Instrumento:
-    """Instrumento General MIDI.
+    """Instrumento General MIDI. Objeto de valor imutável.
 
-    `programa` é o número de program change do MIDI, de 0 a 127
-    (é o que o mido usa). Na lista da Wikipédia os instrumentos vão de
-    1 a 128, então programa = número_da_lista - 1.
+    Attributes:
+        programa: número de program change do MIDI (0–127).
+        nome: nome exibido para o usuário.
     """
 
     programa: int
@@ -26,25 +32,29 @@ class Instrumento:
 
 
 class CatalogoInstrumentos:
-    """Conjunto de instrumentos disponíveis no software (mínimo 25).
+    """Instrumentos que o usuário pode escolher na interface (30, mínimo 25).
 
-    Obrigatórios pelo enunciado: Church/Pipe Organ, Tubular Bells, Cravo,
-    Órgão, Piano, Fagote, Cordas, Bandoneon, Gaita de Foles, Agogô, e
-    Ondas do Mar se continuarem usando.
-
-    ATENÇÃO: o enunciado mistura numerações. "Piano (GM 0)", "Cravo (GM 6)",
-    "Fagote (GM 70)" e "Cordas (GM 48)" estão em 0–127; "Church Organ
-    (GM 20)", "Tubular Bells (GM 15)", "Bandoneon (#24)" etc. estão em
-    1–128. Convertam tudo para 0–127 aqui e documentem a suposição.
+    Inclui todos os obrigatórios do enunciado: Piano, Cravo, Órgão de
+    igreja, Sinos tubulares, Bandoneon, Cordas, Fagote, Gaita de foles,
+    Agogô e Ondas do mar. As regras do texto podem gerar qualquer programa
+    de 0 a 127, mesmo fora do catálogo.
     """
 
     def __init__(self, instrumentos: list[Instrumento]) -> None:
+        """Guarda a lista e monta um índice programa -> Instrumento.
+
+        Args:
+            instrumentos: instrumentos na ordem em que devem aparecer na tela.
+        """
         self._instrumentos: list[Instrumento] = instrumentos
         self._por_programa = {i.programa: i for i in instrumentos}
 
     @classmethod
     def padrao(cls) -> "CatalogoInstrumentos":
-        """Catálogo com os ≥25 instrumentos escolhidos pelo grupo.
+        """Cria o catálogo com os 30 instrumentos escolhidos pelo grupo.
+
+        Returns:
+            CatalogoInstrumentos com programas MIDI de 0 a 127.
         """
         """Catálogo com os 30 instrumentos escolhidos pelo grupo (programas MIDI 0–127)."""
         return cls([
@@ -81,15 +91,31 @@ class CatalogoInstrumentos:
         ])
 
     def listar(self) -> list[Instrumento]:
-        """Todos os instrumentos, na ordem de exibição (usado no dropdown)."""
+        """Devolve uma cópia da lista de instrumentos, na ordem de exibição."""
         return list(self._instrumentos)
 
     def buscar(self, programa: int) -> Instrumento:
-        """Raises: KeyError se o programa não estiver no catálogo."""
+        """Procura um instrumento pelo número do programa.
+
+        Args:
+            programa: número de programa MIDI.
+
+        Returns:
+            O Instrumento correspondente.
+
+        Raises:
+            KeyError: se o programa não estiver no catálogo.
+        """
         return self._por_programa[programa]
 
     def contem(self, programa: int) -> bool:
+        """Diz se o programa MIDI está no catálogo."""
         return programa in self._por_programa
 
     def nome_de(self, programa: int) -> str:
+        """Devolve o nome do instrumento de um programa MIDI.
+
+        Raises:
+            KeyError: se o programa não estiver no catálogo.
+        """
         return self.buscar(programa).nome

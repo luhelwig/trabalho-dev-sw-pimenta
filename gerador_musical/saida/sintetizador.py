@@ -10,23 +10,38 @@ from gerador_musical.musica.voz import Voz
 class Sintetizador:
     """Converte uma Partitura em um arquivo MIDI em memória (mido.MidiFile).
 
-    Formato sugerido: MIDI tipo 1 (várias trilhas tocando juntas)
-      - trilha 0: só andamento (set_tempo inicial + uma por MudancaAndamento);
+    Formato: MIDI tipo 1 (várias trilhas tocando juntas):
+      - trilha 0: só andamento (set_tempo inicial + um por MudancaAndamento);
       - trilha i+1: voz i, no canal voz.canal_midi().
 
-    MUDANÇAS EM RELAÇÃO À FASE 1:
-      - gerar_onda(evento) virou gerar_mensagens(evento, canal): com MIDI
-        não geramos forma de onda, e sim mensagens note_on/note_off;
-      - exportar_midi saiu daqui para ExportadorMidi (gravar arquivo é
-        outra responsabilidade e permite novos formatos sem mexer aqui).
+    O tempo das mensagens MIDI é DELTA: ticks desde a mensagem anterior da
+    mesma trilha. Pausas não geram mensagem; só atrasam a próxima.
+
+    Mudanças em relação à Fase 1: gerar_onda(evento) virou
+    gerar_mensagens(evento, canal), porque com MIDI não geramos forma de
+    onda, e sim mensagens note_on/note_off; e exportar o arquivo saiu daqui
+    para o ExportadorMidi (outra responsabilidade).
+
+    Attributes:
+        TICKS_POR_BEAT: resolução do arquivo MIDI (480 ticks por beat).
+        partitura: última partitura convertida.
     """
 
     TICKS_POR_BEAT = 480
 
     def __init__(self) -> None:
+        """Cria o sintetizador, ainda sem partitura."""
         self.partitura: Partitura | None = None
 
     def gerar_musica(self, partitura: Partitura) -> mido.MidiFile:
+        """Converte a partitura em MIDI tipo 1.
+
+        Args:
+            partitura: música interpretada.
+
+        Returns:
+            MidiFile com a trilha de andamento e uma trilha por voz.
+        """
         self.partitura = partitura
         midi = mido.MidiFile(type=1, ticks_per_beat=self.TICKS_POR_BEAT)
         midi.tracks.append(self._criar_trilha_andamento(partitura))
@@ -35,8 +50,17 @@ class Sintetizador:
         return midi
 
     def _criar_trilha_andamento(self, partitura: Partitura) -> mido.MidiTrack:
-        """set_tempo usa microssegundos por beat: mido.bpm2tempo(bpm).
-        Mensagens em MIDI usam tempo DELTA (ticks desde a anterior)."""
+        """Cria a trilha 0, só com mensagens set_tempo.
+
+        set_tempo usa microssegundos por beat (mido.bpm2tempo(bpm)), e o time
+        de cada mensagem é o delta em ticks desde a anterior.
+
+        Args:
+            partitura: música interpretada.
+
+        Returns:
+            A trilha de andamento.
+        """
         trilha = mido.MidiTrack()
         trilha.append(mido.MetaMessage("set_tempo", tempo=mido.bpm2tempo(partitura.get_bpm_inicial()), time=0))
         tick_anterior = 0
@@ -48,8 +72,19 @@ class Sintetizador:
         return trilha
 
     def _criar_trilha_voz(self, voz: Voz) -> mido.MidiTrack:
-        """Atraso inicial + program_change sempre que o instrumento mudar
-        + mensagens de cada evento."""
+        """Cria a trilha de uma voz.
+
+        Começa com o atraso da voz, emite program_change sempre que o
+        instrumento muda e note_on/note_off para cada nota. Pausas só acumulam
+        espera; se a voz termina com pausas, um end_of_track segura a trilha até
+        o fim do silêncio.
+
+        Args:
+            voz: voz a converter.
+
+        Returns:
+            A trilha da voz.
+        """
         trilha = mido.MidiTrack()
         canal = voz.canal_midi()
         espera = self.beats_para_ticks(voz.get_atraso())
@@ -71,8 +106,15 @@ class Sintetizador:
         return trilha
 
     def gerar_mensagens(self, evento: EventoMusical, canal: int) -> list[mido.Message]:
-        """Nota -> note_on + note_off (velocity = volume).
-        Pausa -> nenhuma mensagem; só avança o tempo da próxima."""
+        """Gera as mensagens MIDI de uma nota (velocity = volume).
+
+        Args:
+            evento: evento do tipo nota.
+            canal: canal MIDI da voz.
+
+        Returns:
+            [note_on com time=0, note_off com time = duração em ticks].
+        """
         altura = evento.altura_midi()
         ticks = self.beats_para_ticks(evento.duracao_em_beats())
         return [
@@ -80,4 +122,5 @@ class Sintetizador:
             mido.Message("note_off", note=altura, velocity=0, channel=canal, time=ticks),
         ]
     def beats_para_ticks(self, beats: float) -> int:
+        """Converte beats em ticks MIDI inteiros (beats * TICKS_POR_BEAT)."""
         return round(beats * self.TICKS_POR_BEAT)

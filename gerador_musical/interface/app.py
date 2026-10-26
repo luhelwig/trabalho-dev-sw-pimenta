@@ -9,14 +9,22 @@ from gerador_musical.interface.tela_principal import TelaPrincipal
 from gerador_musical.interface.tela_reproducao import TelaReproducao
 
 class App(tk.Tk):
-    """Guarda as três telas e mostra uma de cada vez.
+    """Janela principal: guarda as três telas e mostra uma de cada vez.
 
     Telas (croqui): "principal", "carregamento", "reproducao".
+
+    Attributes:
+        controlador: fachada do sistema, usada pelas telas.
     """
 
     TITULO = "Gerador de Música a partir de Texto"
 
     def __init__(self, controlador: ControladorAplicacao) -> None:
+        """Prepara o tema, cria a janela e guarda o controlador.
+
+        Args:
+            controlador: fachada do sistema.
+        """
         estilo.preparar_sistema()        # antes de criar a janela (fonte e nitidez no Windows)
         super().__init__()
         estilo.preparar(self)            # escolhe a fonte e calcula a escala
@@ -24,8 +32,10 @@ class App(tk.Tk):
         self._telas: dict[str, tk.Frame] = {}
 
     def construir(self) -> None:
-        """Cria as telas (TelaPrincipal, TelaCarregamento, TelaReproducao)
-        no mesmo lugar (grid) e mostra a principal."""
+        """Cria as três telas no mesmo lugar (grid) e mostra a principal.
+
+        A janela tem tamanho fixo, porque o layout segue as medidas do Figma.
+        """
         self.title(self.TITULO)
         self.configure(bg=estilo.FUNDO)
         self.resizable(False, False)     # o layout segue as medidas do Figma
@@ -38,19 +48,38 @@ class App(tk.Tk):
         self.mostrar_tela("principal")
 
     def mostrar_tela(self, nome: str) -> None:
-        """Mostra só a tela `nome`. A janela assume o tamanho dela, como no
-        Figma (cada frame tem uma altura)."""
+        """Mostra só a tela `nome`; a janela assume o tamanho dela.
+
+        Args:
+            nome: "principal", "carregamento" ou "reproducao".
+        """
         for tela in self._telas.values():
             tela.grid_remove()
         self._telas[nome].grid()
 
     def tela(self, nome: str) -> tk.Frame:
-        """Acesso a uma tela (ex.: carregamento entrega o texto à principal)."""
+        """Dá acesso a uma tela (ex.: o carregamento entrega o texto à principal).
+
+        Args:
+            nome: nome da tela.
+
+        Returns:
+            O Frame da tela.
+        """
         return self._telas[nome]
 
     def mostrar_erro(self, mensagem: str) -> None:
-        """messagebox.showerror — usado para "texto vazio", "formato incorreto"..."""
+        """Mostra uma caixa de erro (ex.: "texto vazio", "formato incorreto").
+
+        Args:
+            mensagem: texto da mensagem.
+        """
         messagebox.showerror("Erro", mensagem)
 
     def mostrar_info(self, mensagem: str) -> None:
+        """Mostra uma caixa de informação (ex.: onde o arquivo foi salvo).
+
+        Args:
+            mensagem: texto da mensagem.
+        """
         messagebox.showinfo(self.TITULO, mensagem)

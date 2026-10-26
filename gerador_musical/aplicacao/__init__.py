@@ -1,1 +1,1 @@
-"""Camada de aplicação: liga a interface ao domínio."""
+"""Camada de aplicação: liga a interface ao resto do sistema."""

@@ -9,6 +9,8 @@ from gerador_musical.musica.parametros_musica import ParametrosMusica
 
 
 class TipoEvento(Enum):
+    """Tipo de evento: NOTA (soa) ou PAUSA (silêncio)."""
+
     NOTA = auto()
     PAUSA = auto()
 
@@ -17,16 +19,23 @@ class TipoEvento(Enum):
 class EventoMusical:
     """Algo que ocupa tempo na linha do tempo de uma voz: nota ou pausa.
 
-    Cada nota guarda uma "foto" dos parâmetros da voz no momento em que
-    foi lida (instrumento, oitava, volume). Assim o Sintetizador não
-    precisa reinterpretar comandos.
+    Cada nota guarda uma "foto" dos parâmetros da voz no momento em que foi
+    lida (instrumento, oitava, volume). Assim o Sintetizador não precisa
+    reinterpretar comandos, e um comando lido depois não altera notas que
+    já foram criadas.
 
-    MUDANÇAS EM RELAÇÃO À FASE 1:
-      - `nota` virou NotaMusical (letra + acidente);
-      - `duracao` virou o enum Duracao;
-      - eh_acao() saiu: comandos (volume, oitava, instrumento) não viram
-        eventos, só alteram ParametrosMusica; mudança de BPM vira
-        MudancaAndamento na Partitura.
+    Mudanças em relação à Fase 1: `nota` virou NotaMusical (letra +
+    acidente); `duracao` virou o enum Duracao; eh_acao() saiu, porque
+    comandos não viram eventos (só alteram ParametrosMusica ou registram
+    MudancaAndamento na Partitura).
+
+    Attributes:
+        tipo: NOTA ou PAUSA.
+        duracao: figura de duração.
+        nota: a nota (None em pausas).
+        instrumento: programa MIDI da nota (None em pausas).
+        oitava: oitava da nota (None em pausas).
+        volume: volume da nota, 0–127 (None em pausas).
     """
 
     tipo: TipoEvento
@@ -40,7 +49,16 @@ class EventoMusical:
     def criar_nota(
         cls, nota: NotaMusical, duracao: Duracao, parametros: ParametrosMusica
     ) -> "EventoMusical":
-        """Cria uma nota copiando instrumento/oitava/volume ATUAIS da voz."""
+        """Cria uma nota copiando instrumento, oitava e volume ATUAIS da voz.
+
+        Args:
+            nota: letra + acidente.
+            duracao: figura de duração.
+            parametros: parâmetros atuais da voz.
+
+        Returns:
+            Evento do tipo NOTA.
+        """
         return cls(
             tipo=TipoEvento.NOTA,
             duracao=duracao,
@@ -51,19 +69,32 @@ class EventoMusical:
 
     @classmethod
     def criar_pausa(cls, duracao: Duracao) -> "EventoMusical":
+        """Cria uma pausa (silêncio) com a duração dada.
+
+        Args:
+            duracao: figura de duração.
+
+        Returns:
+            Evento do tipo PAUSA.
+        """
         return cls(
             tipo=TipoEvento.PAUSA,
             duracao=duracao
         )
 
     def eh_nota(self) -> bool:
+        """Diz se o evento é uma nota."""
         return self.tipo is TipoEvento.NOTA
 
     def eh_pausa(self) -> bool:
+        """Diz se o evento é uma pausa."""
         return self.tipo is TipoEvento.PAUSA
 
     def altura_midi(self) -> int:
-        """NOVO — número MIDI da nota (usa nota.altura_midi(oitava)).
+        """NOVO — número MIDI da nota (nota.altura_midi(oitava)).
+
+        Returns:
+            Altura MIDI de 0 a 127.
 
         Raises:
             ValueError: se o evento for pausa.
@@ -74,4 +105,5 @@ class EventoMusical:
             return self.nota.altura_midi(self.oitava)
 
     def duracao_em_beats(self) -> float:
+        """Devolve a duração do evento em beats."""
         return self.duracao.em_beats()

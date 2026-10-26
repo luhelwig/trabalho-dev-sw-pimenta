@@ -1,1 +1,1 @@
-"""Leitura do texto de entrada (teclado ou arquivo .txt)."""
+"""Entrada: o texto do usuário, digitado ou carregado de um arquivo .txt."""

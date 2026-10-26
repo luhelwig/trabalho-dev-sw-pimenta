@@ -17,18 +17,24 @@ if TYPE_CHECKING:
 class TelaCarregamento(tk.Frame):
     """Frame "upload botton" do Figma: área "buscar arquivo..." + "voltar".
 
-    Ao escolher um .txt válido, o texto vai para o campo da tela principal
-    e o usuário volta para ela.
+    Ao escolher um .txt válido, o texto vai para o campo da tela principal e
+    o usuário volta para ela.
     """
 
     LARGURA, ALTURA = 813, 527
 
     def __init__(self, app: App) -> None:
+        """Cria a tela, ainda sem widgets (eles nascem em construir()).
+
+        Args:
+            app: janela principal.
+        """
         super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
         self.desenho: estilo.Desenho | None = None
 
     def construir(self) -> None:
+        """Desenha o cartão, a área "buscar arquivo..." e o botão "voltar"."""
         d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
         d.retangulo(25, 19, 764, 486, 57, estilo.CARTAO)
@@ -45,6 +51,7 @@ class TelaCarregamento(tk.Frame):
         d.botao(599, 393, 153, 76, "voltar", self._ao_voltar)
 
     def _ao_procurar_arquivo(self) -> None:
+        """Clique em "buscar arquivo...": abre o diálogo e carrega o .txt escolhido."""
         nome = filedialog.askopenfilename(filetypes=[("Texto", "*.txt")])
         if not nome:                            # usuário cancelou
             return
@@ -52,7 +59,13 @@ class TelaCarregamento(tk.Frame):
 
     def carregar(self, caminho: Path) -> None:
         """Carrega o arquivo e entrega o texto à tela principal.
-        Separado do diálogo para poder ser testado sem abrir janela."""
+
+        Separado do diálogo para poder ser testado sem abrir janela. Em erro,
+        mostra a mensagem e continua nesta tela.
+
+        Args:
+            caminho: arquivo .txt escolhido.
+        """
         try:
             texto = self.app.controlador.carregar_arquivo(caminho)
         except GeradorMusicalErro as erro:
@@ -62,4 +75,5 @@ class TelaCarregamento(tk.Frame):
         self._ao_voltar()
 
     def _ao_voltar(self) -> None:
+        """Volta para a tela principal."""
         self.app.mostrar_tela("principal")

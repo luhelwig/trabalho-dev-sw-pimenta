@@ -8,6 +8,10 @@ Como funciona:
   - A escala é calculada uma vez, para a tela mais alta caber no monitor.
   - O tkinter não tem cantos arredondados: botões, pílulas e painéis são
     desenhados no Canvas, e o clique é ligado com tag_bind.
+
+Constantes: as cores do Figma (FUNDO, CARTAO, PAINEL, ESCURO, VERMELHO),
+a fonte (Micro 5, com Courier New de reserva), os tamanhos de texto
+(TITULO, TEXTO) e ICONES, os ícones desenhados numa grade 24x24.
 """
 
 from __future__ import annotations
@@ -44,9 +48,12 @@ _fator_fonte = 0.6          # Courier é mais larga que a Micro 5
 
 
 def preparar_sistema() -> None:
-    """Chamar ANTES de criar a janela. Carrega a fonte do arquivo .ttf só
-    para este programa (ninguém precisa instalar) e, no Windows, deixa o
-    texto nítido com zoom de tela (125%, 150%)."""
+    """Prepara o sistema operacional. Chamar ANTES de criar a janela.
+
+    Carrega a fonte do arquivo .ttf só para este programa (ninguém precisa
+    instalar) e, no Windows, deixa o texto nítido com zoom de tela (125%,
+    150%).
+    """
     if sys.platform == "win32":
         _preparar_windows()
     else:
@@ -54,6 +61,7 @@ def preparar_sistema() -> None:
 
 
 def _preparar_windows() -> None:
+    """Windows: ativa o modo de alta resolução e registra a fonte só neste processo."""
     import ctypes
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -65,8 +73,11 @@ def _preparar_windows() -> None:
 
 
 def _carregar_fonte_fontconfig() -> None:
-    """Linux: registra o .ttf no fontconfig, a biblioteca que o tkinter usa
-    para encontrar fontes. Se algo falhar, o programa segue com a reserva."""
+    """Linux: registra o .ttf no fontconfig, que é onde o tkinter procura fontes.
+
+    Se a biblioteca fontconfig não existir ou algo falhar, o programa segue
+    com a fonte reserva.
+    """
     import ctypes
     import ctypes.util
     biblioteca = ctypes.util.find_library("fontconfig")
@@ -81,7 +92,15 @@ def _carregar_fonte_fontconfig() -> None:
 
 
 def preparar(janela: tk.Tk) -> None:
-    """Chamar logo DEPOIS de criar a janela: escolhe a fonte e calcula a escala."""
+    """Escolhe a fonte e calcula a escala. Chamar logo DEPOIS de criar a janela.
+
+    Usa a Micro 5 se ela estiver disponível (senão, Courier New um pouco
+    menor) e calcula a escala para a tela mais alta ocupar
+    FRACAO_DO_MONITOR da altura livre do monitor.
+
+    Args:
+        janela: janela principal do tkinter.
+    """
     global _escala, _familia, _fator_fonte
     if FAMILIA in tkfont.families(janela):
         _familia, _fator_fonte = FAMILIA, 1.0
@@ -90,12 +109,27 @@ def preparar(janela: tk.Tk) -> None:
 
 
 def px(medida: float) -> int:
-    """Converte uma medida do Figma para pixels na tela."""
+    """Converte uma medida do Figma para pixels na tela.
+
+    Args:
+        medida: medida em px do Figma.
+
+    Returns:
+        round(medida * escala).
+    """
     return round(medida * _escala)
 
 
 def fonte(tamanho: float = TEXTO) -> tuple[str, int]:
-    """Fonte do tema. Tamanho negativo = em pixels (e não em pontos)."""
+    """Devolve a fonte do tema num tamanho do Figma.
+
+    Args:
+        tamanho: tamanho da fonte em px do Figma (padrão TEXTO = 65).
+
+    Returns:
+        (família, -tamanho_em_pixels). No tkinter, tamanho negativo significa
+        pixels; positivo seria pontos.
+    """
     return (_familia, -max(1, round(px(tamanho) * _fator_fonte)))
 
 
@@ -117,6 +151,13 @@ class Desenho(tk.Canvas):
     """Canvas que recebe medidas do Figma. Cada tela desenha nele."""
 
     def __init__(self, mestre: tk.Misc, largura: float, altura: float) -> None:
+        """Cria o Canvas com o tamanho do frame do Figma convertido por px().
+
+        Args:
+            mestre: widget onde o Canvas fica (a tela).
+            largura: largura do frame no Figma.
+            altura: altura do frame no Figma.
+        """
         super().__init__(mestre, width=px(largura), height=px(altura), bg=FUNDO, highlightthickness=0, bd=0)
         self._contador_tags = 0
 
@@ -124,8 +165,23 @@ class Desenho(tk.Canvas):
 
     def retangulo(self, x: float, y: float, largura: float, altura: float, raio: float, cor: str,
                   tags: str | tuple = ()) -> int:
-        """Retângulo de cantos arredondados: um polígono cujos cantos são
-        quartos de círculo de raio `raio` (raio 0 = cantos retos)."""
+        """Desenha um retângulo de cantos arredondados.
+
+        É um polígono cujos cantos são quartos de círculo, calculados de 15 em
+        15 graus (raio 0 = cantos retos).
+
+        Args:
+            x: esquerda, em px do Figma.
+            y: topo, em px do Figma.
+            largura: largura em px do Figma.
+            altura: altura em px do Figma.
+            raio: raio dos cantos em px do Figma.
+            cor: cor de preenchimento e de contorno.
+            tags: tags do tkinter (para agrupar itens clicáveis).
+
+        Returns:
+            O id do item no Canvas.
+        """
         x1, y1, x2, y2, r = px(x), px(y), px(x + largura), px(y + altura), px(raio)
         if r == 0:
             return self.create_rectangle(x1, y1, x2, y2, fill=cor, outline=cor, tags=tags)
@@ -138,16 +194,55 @@ class Desenho(tk.Canvas):
         return self.create_polygon(pontos, fill=cor, outline=cor, tags=tags)
 
     def circulo(self, x: float, y: float, diametro: float, cor: str, tags: str | tuple = ()) -> int:
+        """Desenha um círculo preenchido.
+
+        Args:
+            x: esquerda, em px do Figma.
+            y: topo, em px do Figma.
+            diametro: diâmetro em px do Figma.
+            cor: cor do círculo.
+            tags: tags do tkinter.
+
+        Returns:
+            O id do item no Canvas.
+        """
         return self.create_oval(px(x), px(y), px(x + diametro), px(y + diametro), fill=cor, outline=cor, tags=tags)
 
     def texto(self, x: float, y: float, texto: str, tamanho: float = TEXTO, cor: str = ESCURO,
               ancora: str = "nw", tags: str | tuple = ()) -> int:
+        """Escreve um texto na fonte do tema.
+
+        Args:
+            x: posição horizontal, em px do Figma.
+            y: posição vertical, em px do Figma.
+            texto: o que escrever.
+            tamanho: tamanho da fonte em px do Figma.
+            cor: cor do texto.
+            ancora: ponto do texto que fica em (x, y): "nw" canto superior
+                esquerdo, "center" meio, "ne" canto superior direito...
+            tags: tags do tkinter.
+
+        Returns:
+            O id do item no Canvas (para trocar o texto depois com itemconfig).
+        """
         return self.create_text(px(x), px(y), text=texto, fill=cor, font=fonte(tamanho), anchor=ancora, tags=tags)
 
     def icone(self, nome: str, x: float, y: float, largura: float, altura: float, cor: str,
               espessura: float = 3.5, tags: str | tuple = ()) -> None:
-        """Desenha um ícone de ICONES dentro da caixa (x, y, largura, altura) do Figma."""
+        """Desenha um ícone de ICONES dentro de uma caixa do Figma.
+
+        Args:
+            nome: chave em ICONES ("upload", "nuvem", "alto_falante", "tocar", "pausar").
+            x: esquerda da caixa, em px do Figma.
+            y: topo da caixa, em px do Figma.
+            largura: largura da caixa.
+            altura: altura da caixa.
+            cor: cor do traço.
+            espessura: espessura do traço em px do Figma.
+            tags: tags do tkinter.
+        """
         def ponto(a: float, b: float) -> tuple[int, int]:
+            """Converte um ponto da grade 24x24 do ícone em pixels da tela."""
             return px(x + a * largura / 24), px(y + b * altura / 24)
 
         traco = max(1, px(espessura))
@@ -164,31 +259,66 @@ class Desenho(tk.Canvas):
                                 style="arc", outline=cor, width=traco, tags=tags)
 
     def pintar(self, item: int, cor: str) -> None:
-        """Troca a cor de uma forma (ex.: aba de voz selecionada)."""
+        """Troca a cor de uma forma (ex.: aba de voz selecionada).
+
+        Args:
+            item: id do item no Canvas.
+            cor: nova cor de preenchimento e de contorno.
+        """
         self.itemconfig(item, fill=cor, outline=cor)
 
     def widget(self, x: float, y: float, largura: float, altura: float, widget: tk.Widget) -> int:
-        """Coloca um widget do tkinter (ex.: tk.Text) na posição do Figma."""
+        """Coloca um widget do tkinter (ex.: tk.Text) na posição do Figma.
+
+        Args:
+            x: esquerda, em px do Figma.
+            y: topo, em px do Figma.
+            largura: largura em px do Figma.
+            altura: altura em px do Figma.
+            widget: o widget a posicionar.
+
+        Returns:
+            O id da janela no Canvas.
+        """
         return self.create_window(px(x), px(y), window=widget, anchor="nw", width=px(largura), height=px(altura))
 
     # ---- Cliques ------------------------------------------------------------
 
     def nova_tag(self) -> str:
-        """Nome único para agrupar os itens de um botão (fundo + texto + ícone)."""
+        """Gera um nome único para agrupar os itens de um botão (fundo + texto + ícone)."""
         self._contador_tags += 1
         return f"clicavel{self._contador_tags}"
 
     def tornar_clicavel(self, tag: str, comando: Callable[[], None]) -> None:
-        """Clique em qualquer item com essa tag chama comando(); o cursor vira mãozinha."""
+        """Liga o clique nos itens da tag a um comando e mostra a "mãozinha".
+
+        Args:
+            tag: tag dos itens clicáveis.
+            comando: função chamada no clique, sem argumentos.
+        """
         self.tag_bind(tag, "<Button-1>", lambda evento: comando())
         self.tag_bind(tag, "<Enter>", lambda evento: self.config(cursor="hand2"))
         self.tag_bind(tag, "<Leave>", lambda evento: self.config(cursor=""))
 
     def botao(self, x: float, y: float, largura: float, altura: float, texto: str,
               comando: Callable[[], None], cor: str = ESCURO, raio: float = 22) -> tuple[int, int]:
-        """Botão arredondado com texto creme no meio.
-        cor=ESCURO: botão principal; cor=FUNDO: pílula secundária.
-        Devolve (id do fundo, id do texto) para poder mudar cor/texto depois."""
+        """Desenha um botão arredondado com texto creme no meio.
+
+        cor=ESCURO é o botão principal; cor=FUNDO é a pílula secundária.
+
+        Args:
+            x: esquerda, em px do Figma.
+            y: topo, em px do Figma.
+            largura: largura em px do Figma.
+            altura: altura em px do Figma.
+            texto: rótulo do botão.
+            comando: função chamada no clique.
+            cor: cor do fundo.
+            raio: raio dos cantos.
+
+        Returns:
+            (id do fundo, id do texto), para mudar a cor ou o texto depois.
+        """
         tag = self.nova_tag()
         fundo = self.retangulo(x, y, largura, altura, raio, cor, tags=tag)
         rotulo = self.texto(x + largura / 2, y + altura / 2, texto, cor=PAINEL, ancora="center", tags=tag)
@@ -197,12 +327,27 @@ class Desenho(tk.Canvas):
 
 
 class Deslizador:
-    """Barra de volume do Figma: trilho fino + bolinha escura que se arrasta."""
+    """Barra de volume do Figma: trilho fino + bolinha escura que se arrasta.
+
+    Attributes:
+        DIAMETRO: diâmetro da bolinha em px do Figma.
+    """
 
     DIAMETRO = 24
 
     def __init__(self, desenho: Desenho, x: float, y: float, largura: float, minimo: int, maximo: int,
                  comando: Callable[[int], None]) -> None:
+        """Desenha o deslizador e liga clique e arrasto.
+
+        Args:
+            desenho: Canvas onde desenhar.
+            x: início do trilho, em px do Figma.
+            y: topo do trilho, em px do Figma.
+            largura: comprimento do trilho.
+            minimo: valor na ponta esquerda.
+            maximo: valor na ponta direita.
+            comando: função chamada com o novo valor quando o usuário arrasta.
+        """
         self.desenho = desenho
         self.x, self.largura = x, largura
         self.centro_y = y + 3.5
@@ -218,12 +363,21 @@ class Deslizador:
         desenho.tag_bind(tag, "<Leave>", lambda evento: desenho.config(cursor=""))
 
     def set(self, valor: int) -> None:
-        """Move a bolinha (não chama o comando)."""
+        """Move a bolinha para a posição do valor (não chama o comando).
+
+        Args:
+            valor: valor entre mínimo e máximo.
+        """
         fracao = (valor - self.minimo) / (self.maximo - self.minimo)
         cx, r = self.x + fracao * self.largura, self.DIAMETRO / 2
         self.desenho.coords(self.bolinha, px(cx - r), px(self.centro_y - r), px(cx + r), px(self.centro_y + r))
 
     def _ao_arrastar(self, evento: tk.Event) -> None:
+        """Converte a posição do mouse em valor, move a bolinha e chama o comando.
+
+        Args:
+            evento: clique ou movimento do mouse (usa evento.x).
+        """
         fracao = (evento.x - px(self.x)) / px(self.largura)
         fracao = min(1.0, max(0.0, fracao))
         valor = round(self.minimo + fracao * (self.maximo - self.minimo))

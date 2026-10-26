@@ -1,7 +1,8 @@
-"""Exceções do domínio.
+"""Exceções do domínio (erros esperados durante o uso).
 
-A interface captura estas exceções e mostra a mensagem correspondente
-(ex.: "texto vazio", "formato incorreto"), sem precisar conhecer as regras.
+Todas herdam de GeradorMusicalErro. A interface captura essa classe base
+e mostra a mensagem ao usuário (ex.: "texto vazio", "formato
+incorreto"), sem precisar conhecer as regras que geraram o erro.
 """
 
 
@@ -10,19 +11,24 @@ class GeradorMusicalErro(Exception):
 
 
 class TextoVazioErro(GeradorMusicalErro):
-    """Tentativa de gerar música com o campo de entrada vazio."""
+    """Tentativa de gerar música com o campo de texto vazio ou só com espaços."""
 
 
 class FormatoInvalidoErro(GeradorMusicalErro):
-    """Texto contém caracteres fora do alfabeto aceito (ex.: outros alfabetos)."""
+    """O texto tem caracteres fora do alfabeto aceito (ex.: de outros alfabetos)."""
 
 
 class ArquivoInvalidoErro(GeradorMusicalErro):
-    """Arquivo inexistente, ilegível ou que não é .txt."""
+    """Arquivo inexistente, que não é .txt, ou "salvar" sem saber onde gravar."""
 
 
 class MusicaNaoGeradaErro(GeradorMusicalErro):
-    """Tentativa de tocar/exportar antes de gerar a música."""
+    """Tentativa de tocar ou exportar antes de gerar a música."""
 
 class AudioIndisponivelErro(GeradorMusicalErro):
-    """"Este computador não consegue tocar o MIDI (sem módulo de som ou sem banco de sons)."""
+    """Este computador não consegue tocar o MIDI.
+
+    Acontece quando o pygame foi instalado sem o módulo de som ou, no Linux,
+    quando não há banco de sons (.sf2). O arquivo .mid pode ser salvo mesmo
+    assim.
+    """

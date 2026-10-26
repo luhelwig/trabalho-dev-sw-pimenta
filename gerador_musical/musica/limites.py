@@ -1,7 +1,9 @@
-"""NOVO: limites numéricos num lugar só (para evitar números mágicos espalhados).
+"""Limites numéricos usados no sistema, reunidos num lugar só.
 
-Os valores de MIDI (0–127) são fixos pelo padrão; os demais são
-sugestões — o grupo deve confirmar e registrar como suposição.
+Evita "números mágicos" espalhados pelo código. Volume e programa MIDI
+vão de 0 a 127 pelo padrão MIDI. A oitava vai de 0 a 8 porque, com
+altura = 12 * (oitava + 1) + semitom, a oitava 8 é a última completa
+dentro de 0–127. O BPM fica entre 20 e 300 (decisão do grupo).
 """
 
 VOLUME_MINIMO = 0

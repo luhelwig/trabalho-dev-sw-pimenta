@@ -1,4 +1,4 @@
-"""Tela de reprodução do croqui: tocar, pausar/retomar, parar, salvar MIDI."""
+"""Tela de reprodução do croqui: tocar, pausar/retomar, parar e salvar MIDI."""
 
 from __future__ import annotations
 
@@ -24,6 +24,10 @@ class TelaReproducao(tk.Frame):
     NOVO na Fase 2 (requisito de interromper e retomar): o play vira
     pausar/retomar enquanto toca, pílula "parar", estado no canto
     ("tocando...", "pausada", "fim") e aviso quando a música termina.
+
+    Attributes:
+        INTERVALO_VERIFICACAO_MS: de quanto em quanto tempo conferir se a
+            música acabou.
     """
 
     INTERVALO_VERIFICACAO_MS = 200
@@ -31,6 +35,11 @@ class TelaReproducao(tk.Frame):
     TAG_ICONE_PLAY = "icone_play"
 
     def __init__(self, app: App) -> None:
+        """Cria a tela parada, ainda sem widgets (eles nascem em construir()).
+
+        Args:
+            app: janela principal.
+        """
         super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
         self.desenho: estilo.Desenho | None = None
@@ -38,6 +47,7 @@ class TelaReproducao(tk.Frame):
         self._pausado: bool = False
 
     def construir(self) -> None:
+        """Desenha a tela: estado, "baixar midi", "salvar como...", play, "parar" e "voltar"."""
         d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
         d.retangulo(24, 21, 764, 545, 57, estilo.CARTAO)
@@ -62,14 +72,17 @@ class TelaReproducao(tk.Frame):
     # ---- Eventos --------------------------------------------------------
 
     def _ao_tocar_ou_pausar(self) -> None:
-        """Parada -> toca; tocando -> pausa; pausada -> retoma."""
+        """Botão de play: parada -> toca; tocando -> pausa; pausada -> retoma."""
         if self._tocando:
             self._ao_pausar_ou_retomar()
         else:
             self._ao_tocar()
 
     def _ao_tocar(self) -> None:
-        """Toca e agenda _verificar_fim com after(...)."""
+        """Toca e agenda _verificar_fim com after(), sem travar a janela.
+
+        Em GeradorMusicalErro (ex.: computador sem som MIDI), mostra a mensagem.
+        """
         try:
             self.app.controlador.tocar()
         except GeradorMusicalErro as erro:
@@ -83,6 +96,7 @@ class TelaReproducao(tk.Frame):
             self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
 
     def _ao_pausar_ou_retomar(self) -> None:
+        """Alterna entre pausar e retomar (só se estiver tocando)."""
         if not self._tocando:
             return
         if self._pausado:
@@ -93,23 +107,29 @@ class TelaReproducao(tk.Frame):
         self._mostrar_estado("pausada" if self._pausado else "tocando...")
 
     def _ao_parar(self) -> None:
+        """Para a música e zera os estados."""
         self.app.controlador.parar()
         self._tocando = False
         self._pausado = False
         self._mostrar_estado("parada")
 
     def _ao_baixar_midi(self) -> None:
-        """Salva em Downloads com o nome padrão."""
+        """Clique em "baixar midi": salva em Downloads com o nome padrão."""
         self._exportar_midi(None)
 
     def _ao_salvar_midi_como(self) -> None:
-        """Deixa o usuário escolher pasta e nome."""
+        """Clique em "salvar como...": deixa o usuário escolher pasta e nome."""
         nome = filedialog.asksaveasfilename(defaultextension=".mid", filetypes=[("MIDI", "*.mid")])
         if not nome:                            # usuário cancelou
             return
         self._exportar_midi(Path(nome))
 
     def _exportar_midi(self, destino: Path | None) -> None:
+        """Exporta o MIDI e mostra onde salvou, ou o erro.
+
+        Args:
+            destino: caminho escolhido; None para Downloads com o nome padrão.
+        """
         try:
             caminho = self.app.controlador.exportar_midi(destino)
         except GeradorMusicalErro as erro:
@@ -118,13 +138,17 @@ class TelaReproducao(tk.Frame):
         self.app.mostrar_info(f"MIDI salvo em {caminho}")
 
     def _ao_voltar(self) -> None:
+        """Para a música e volta para a tela principal."""
         self._ao_parar()
         self._mostrar_estado("pronta para tocar")
         self.app.mostrar_tela("principal")
 
     def _verificar_fim(self) -> None:
-        """Se a música terminou, mostra a mensagem de conclusão;
-        senão, reagenda a si mesmo (não bloqueia a interface)."""
+        """Confere se a música acabou; se não, agenda a si mesma de novo.
+
+        Quando acaba, mostra "fim" e avisa o usuário. Usar after() em vez de um
+        laço while mantém a janela respondendo enquanto a música toca.
+        """
         if not self._tocando:
             return
         if self.app.controlador.reproducao_terminou():
@@ -137,7 +161,14 @@ class TelaReproducao(tk.Frame):
     # ---- Aparência ------------------------------------------------------
 
     def _mostrar_estado(self, texto: str) -> None:
-        """Escreve o estado no canto e troca ícone/texto do botão de play."""
+        """Escreve o estado no canto e ajusta o botão de play.
+
+        O texto vira "tocar", "pausar" ou "retomar", e o ícone vira play ou
+        pausa.
+
+        Args:
+            texto: estado a mostrar (ex.: "tocando...").
+        """
         d = self.desenho
         d.itemconfig(self.rotulo_estado, text=texto)
         tocando_agora = self._tocando and not self._pausado

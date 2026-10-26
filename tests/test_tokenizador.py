@@ -1,5 +1,4 @@
-"""Testes do Tokenizador. Cada stub descreve o comportamento esperado;
-substitua o pytest.skip pelo teste de verdade."""
+"""Testes do Tokenizador: como cada linha é quebrada em tokens."""
 
 import pytest
 from gerador_musical.interpretacao.tokenizador import Tokenizador
@@ -8,6 +7,7 @@ from gerador_musical.musica.duracao import Duracao
 from gerador_musical.musica.nota_musical import Acidente, NotaMusical
 
 def tokenizar(linha):
+    """Atalho: tokeniza uma linha com um Tokenizador novo."""
     return Tokenizador().tokenizar(linha)
 
 def test_linha_vazia_gera_lista_vazia():

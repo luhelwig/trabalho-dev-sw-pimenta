@@ -1,5 +1,8 @@
-"""Testes do modelo musical: Duracao, NotaMusical, ParametrosMusica,
-ConfiguracaoInicial e Partitura."""
+"""Testes do modelo musical.
+
+Cobre Duracao, NotaMusical, ParametrosMusica, ConfiguracaoInicial,
+Partitura e CatalogoInstrumentos.
+"""
 
 import pytest
 from gerador_musical.musica.duracao import Duracao

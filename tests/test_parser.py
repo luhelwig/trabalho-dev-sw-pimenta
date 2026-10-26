@@ -7,6 +7,7 @@ from gerador_musical.interpretacao.tokenizador import Tokenizador
 from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
 
 def criar_parser(configuracao=None):
+    """Cria um Parser com as peças reais e a configuração dada (ou a padrão)."""
     configuracao = configuracao or ConfiguracaoInicial.padrao()
     return Parser(Tokenizador(), Mapeamento.padrao(), configuracao)
 
