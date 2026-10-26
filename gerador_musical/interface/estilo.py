@@ -44,11 +44,16 @@ _fator_fonte = 0.6          # Courier é mais larga que a Micro 5
 
 
 def preparar_sistema() -> None:
-    """Chamar ANTES de criar a janela. Só faz algo no Windows:
-    deixa o texto nítido com zoom de tela (125%, 150%) e carrega a fonte
-    do arquivo .ttf só para este programa (ninguém precisa instalar)."""
-    if sys.platform != "win32":
-        return
+    """Chamar ANTES de criar a janela. Carrega a fonte do arquivo .ttf só
+    para este programa (ninguém precisa instalar) e, no Windows, deixa o
+    texto nítido com zoom de tela (125%, 150%)."""
+    if sys.platform == "win32":
+        _preparar_windows()
+    else:
+        _carregar_fonte_fontconfig()
+
+
+def _preparar_windows() -> None:
     import ctypes
     try:
         ctypes.windll.shcore.SetProcessDpiAwareness(1)
@@ -57,6 +62,22 @@ def preparar_sistema() -> None:
     if ARQUIVO_FONTE.exists():
         FR_PRIVATE = 0x10
         ctypes.windll.gdi32.AddFontResourceExW(str(ARQUIVO_FONTE), FR_PRIVATE, 0)
+
+
+def _carregar_fonte_fontconfig() -> None:
+    """Linux: registra o .ttf no fontconfig, a biblioteca que o tkinter usa
+    para encontrar fontes. Se algo falhar, o programa segue com a reserva."""
+    import ctypes
+    import ctypes.util
+    biblioteca = ctypes.util.find_library("fontconfig")
+    if biblioteca is None or not ARQUIVO_FONTE.exists():
+        return
+    try:
+        fontconfig = ctypes.CDLL(biblioteca)
+        fontconfig.FcConfigAppFontAddFile.argtypes = [ctypes.c_void_p, ctypes.c_char_p]
+        fontconfig.FcConfigAppFontAddFile(None, str(ARQUIVO_FONTE).encode())
+    except (OSError, AttributeError):
+        pass
 
 
 def preparar(janela: tk.Tk) -> None:

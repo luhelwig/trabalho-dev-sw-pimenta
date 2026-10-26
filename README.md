@@ -19,8 +19,16 @@ python main.py
 
 Para rodar os testes: `pytest`
 
-No Windows o som sai direto pelo sintetizador MIDI do próprio sistema. No Linux o pygame precisa de um sintetizador instalado (timidity ou fluidsynth); sem ele a música não toca, mas o arquivo .mid é gerado normalmente.
+No Windows o som sai direto pelo sintetizador MIDI do próprio sistema. No Linux é preciso instalar também o tkinter (a biblioteca das janelas) e um banco de sons para o MIDI. No Ubuntu:
 
+    sudo apt install python3-tk fluid-soundfont-gm
+
+Sem o banco de sons a música não toca, mas o arquivo .mid é gerado normalmente.
+
+Se você já tinha instalado o projeto antes, com o `pygame`, troque pelo `pygame-ce` antes de tudo:
+
+    pip uninstall -y pygame pygame-ce
+    pip install -r requirements.txt
 ## Como usar
 
 1. Escreva o texto no campo "texto de entrada", ou clique no botão redondo no canto de cima para abrir um arquivo .txt.
@@ -107,5 +115,5 @@ Cada linha da tabela de mapeamento é uma classe de regra. Para criar um comando
 
 ## Créditos
 
-- [mido](https://github.com/mido/mido) para montar o arquivo MIDI e [pygame](https://www.pygame.org) para tocar.
-- Fonte [Micro 5](https://fonts.google.com/specimen/Micro+5) (licença SIL Open Font License), que fica em `gerador_musical/interface/recursos`.
+- [mido](https://github.com/mido/mido) para montar o arquivo MIDI e 
+- [pygame-ce](https://pyga.me) para tocar.

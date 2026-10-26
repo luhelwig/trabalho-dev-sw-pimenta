@@ -23,3 +23,6 @@ class ArquivoInvalidoErro(GeradorMusicalErro):
 
 class MusicaNaoGeradaErro(GeradorMusicalErro):
     """Tentativa de tocar/exportar antes de gerar a música."""
+
+class AudioIndisponivelErro(GeradorMusicalErro):
+    """"Este computador não consegue tocar o MIDI (sem módulo de som ou sem banco de sons)."""
