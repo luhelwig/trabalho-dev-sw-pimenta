@@ -104,6 +104,9 @@ def preparar(janela: tk.Tk) -> None:
     global _escala, _familia, _fator_fonte
     if FAMILIA in tkfont.families(janela):
         _familia, _fator_fonte = FAMILIA, 1.0
+    else:
+        print(f"Aviso: fonte '{FAMILIA}' não encontrada em {ARQUIVO_FONTE}; "
+              f"usando {FAMILIA_RESERVA}.", file=sys.stderr)
     altura_livre = janela.winfo_screenheight() - MARGEM_MONITOR
     _escala = FRACAO_DO_MONITOR * altura_livre / ALTURA_REFERENCIA
 
@@ -368,7 +371,7 @@ class Deslizador:
         Args:
             valor: valor entre mínimo e máximo.
         """
-        fracao = (valor - self.minimo) / (self.maximo - self.minimo)
+        fracao = min(1.0, max(0.0, (valor - self.minimo) / (self.maximo - self.minimo)))
         cx, r = self.x + fracao * self.largura, self.DIAMETRO / 2
         self.desenho.coords(self.bolinha, px(cx - r), px(self.centro_y - r), px(cx + r), px(self.centro_y + r))
 

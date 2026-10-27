@@ -117,3 +117,4 @@ Cada linha da tabela de mapeamento é uma classe de regra. Para criar um comando
 
 - [mido](https://github.com/mido/mido) para montar o arquivo MIDI e 
 - [pygame-ce](https://pyga.me) para tocar.
+- Fonte [Micro 5](https://fonts.google.com/specimen/Micro+5) (licença OFL).

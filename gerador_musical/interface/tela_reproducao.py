@@ -45,6 +45,7 @@ class TelaReproducao(tk.Frame):
         self.desenho: estilo.Desenho | None = None
         self._tocando: bool = False
         self._pausado: bool = False
+        self._id_verificacao: str | None = None
 
     def construir(self) -> None:
         """Desenha a tela: estado, "baixar midi", "salvar como...", play, "parar" e "voltar"."""
@@ -93,7 +94,7 @@ class TelaReproducao(tk.Frame):
         self._pausado = False
         self._mostrar_estado("tocando...")
         if not ja_estava_verificando:           # evita duas verificações em paralelo
-            self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
+            self._id_verificacao = self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
 
     def _ao_pausar_ou_retomar(self) -> None:
         """Alterna entre pausar e retomar (só se estiver tocando)."""
@@ -108,6 +109,9 @@ class TelaReproducao(tk.Frame):
 
     def _ao_parar(self) -> None:
         """Para a música e zera os estados."""
+        if self._id_verificacao is not None:    # cancela a verificação agendada
+            self.after_cancel(self._id_verificacao)
+            self._id_verificacao = None
         self.app.controlador.parar()
         self._tocando = False
         self._pausado = False
@@ -149,6 +153,7 @@ class TelaReproducao(tk.Frame):
         Quando acaba, mostra "fim" e avisa o usuário. Usar after() em vez de um
         laço while mantém a janela respondendo enquanto a música toca.
         """
+        self._id_verificacao = None             # este agendamento já disparou
         if not self._tocando:
             return
         if self.app.controlador.reproducao_terminou():
@@ -156,7 +161,7 @@ class TelaReproducao(tk.Frame):
             self._mostrar_estado("fim")
             self.app.mostrar_info("Fim da música.")
         else:
-            self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
+            self._id_verificacao = self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
 
     # ---- Aparência ------------------------------------------------------
 
