@@ -1,7 +1,12 @@
 """NOVA (Fase 2): fachada usada pela interface para texto, geração, reprodução e exportação.
 
 Fase 3 (bad smell "Classe Grande"): os métodos de configuração (BPM e
-parâmetros por voz) foram extraídos para ControladorConfiguracao.
+parâmetros por voz) foram extraídos para ControladorConfiguracao. E a
+decisão "texto igual -> só regera", que ficava na TelaPrincipal, veio para
+gerar_musica(texto) (bad smell "Inveja de Recursos").
+
+EstadoReproducao é importado aqui para fazer parte da interface pública
+desta fachada: a tela de reprodução o recebe de estado_reproducao().
 """
 
 from pathlib import Path
@@ -10,7 +15,7 @@ from gerador_musical.entrada.entrada_usuario import EntradaUsuario
 from gerador_musical.interpretacao.parser import Parser
 from gerador_musical.musica.partitura import Partitura
 from gerador_musical.saida.exportador import Exportador
-from gerador_musical.saida.player import Player
+from gerador_musical.saida.player import EstadoReproducao, Player
 from gerador_musical.saida.sintetizador import Sintetizador
 from gerador_musical.excecoes import FormatoInvalidoErro, MusicaNaoGeradaErro, TextoVazioErro
 
@@ -50,6 +55,7 @@ class ControladorAplicacao:
         self._player = player
         self._exportador = exportador
         self._musica = None
+        self._texto_gerado: str | None = None   # texto da última geração
 
     # ---- Texto ----------------------------------------------------------
 
@@ -99,10 +105,32 @@ class ControladorAplicacao:
         self._player.parar()
         self._entrada.limpar()
         self._musica = None
+        self._texto_gerado = None
 
     # ---- Geração --------------------------------------------------------
 
-    def gerar_musica(self) -> None:
+    def gerar_musica(self, texto: str) -> None:
+        """Gera a música do texto do campo e carrega no Player.
+
+        Se o texto é o mesmo da última geração, só os parâmetros mudaram:
+        regera sem reinterpretar o texto (requisito). Antes essa decisão ficava
+        na TelaPrincipal, que só usava dados daqui; aqui ela também tem teste.
+
+        Args:
+            texto: conteúdo do campo de texto.
+
+        Raises:
+            TextoVazioErro: campo vazio ou só com espaços.
+            FormatoInvalidoErro: caracteres fora do alfabeto aceito.
+        """
+        if texto == self._texto_gerado and self.musica_foi_gerada():
+            self.regerar_com_novos_parametros()
+            return
+        self.atualizar_texto(texto)
+        self._interpretar_e_gerar()
+        self._texto_gerado = texto
+
+    def _interpretar_e_gerar(self) -> None:
         """Valida a entrada, interpreta, sintetiza e carrega no Player.
 
         Raises:
@@ -165,6 +193,10 @@ class ControladorAplicacao:
     def reproducao_terminou(self) -> bool:
         """Diz se a música terminou sozinha (para o aviso de conclusão)."""
         return self._player.terminou()
+
+    def estado_reproducao(self) -> EstadoReproducao:
+        """NOVO (Fase 3) — diz se a música está PARADA, TOCANDO ou PAUSADA."""
+        return self._player.estado
 
     # ---- Exportação -----------------------------------------------------
 

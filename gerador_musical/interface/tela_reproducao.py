@@ -7,9 +7,11 @@ from pathlib import Path
 from tkinter import filedialog
 from typing import TYPE_CHECKING
 
+from gerador_musical.aplicacao.controlador import EstadoReproducao
 from gerador_musical.excecoes import GeradorMusicalErro
 from gerador_musical.interface import estilo
-from gerador_musical.interface.estilo import Caixa, EstiloTexto
+from gerador_musical.interface.desenho import Caixa, Desenho
+from gerador_musical.interface.estilo import EstiloTexto
 
 if TYPE_CHECKING:
     from gerador_musical.interface.app import App
@@ -26,14 +28,25 @@ class TelaReproducao(tk.Frame):
     pausar/retomar enquanto toca, pílula "parar", estado no canto
     ("tocando...", "pausada", "fim") e aviso quando a música termina.
 
+    Fase 3: a tela não guarda mais uma cópia do estado (eram os booleanos
+    _tocando e _pausado); ela pergunta ao controlador o EstadoReproducao.
+
     Attributes:
         INTERVALO_VERIFICACAO_MS: de quanto em quanto tempo conferir se a
             música acabou.
+        BOTAO_PLAY: para cada estado, o texto e o ícone do botão de play.
+        rotulo_estado: texto do estado, no canto ("tocando...", "fim"...).
+        rotulo_play: texto da pílula de play.
     """
 
     INTERVALO_VERIFICACAO_MS = 200
     LARGURA, ALTURA = 813, 586
     TAG_ICONE_PLAY = "icone_play"
+    BOTAO_PLAY = {
+        EstadoReproducao.PARADA: ("tocar", "tocar"),
+        EstadoReproducao.TOCANDO: ("pausar", "pausar"),
+        EstadoReproducao.PAUSADA: ("retomar", "tocar"),
+    }
 
     def __init__(self, app: App) -> None:
         """Cria a tela parada, ainda sem widgets (eles nascem em construir()).
@@ -43,14 +56,15 @@ class TelaReproducao(tk.Frame):
         """
         super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
-        self.desenho: estilo.Desenho | None = None
-        self._tocando: bool = False
-        self._pausado: bool = False
-        self._id_verificacao: str | None = None
+        self.desenho: Desenho | None = None
+        self.rotulo_estado: int | None = None
+        self.rotulo_play: int | None = None
+        self._tag_play: str = ""
+        self._id_verificacao: str | None = None   # verificação de fim agendada com after()
 
     def construir(self) -> None:
         """Desenha a tela: estado, "baixar midi", "salvar como...", play, "parar" e "voltar"."""
-        d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
+        d = self.desenho = Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
         d.retangulo(Caixa(24, 21, 764, 545), estilo.CARTAO, raio=57)
         d.texto(406, 21, "gerador de música", estilo.ESTILO_TITULO)
@@ -75,10 +89,12 @@ class TelaReproducao(tk.Frame):
 
     def _ao_tocar_ou_pausar(self) -> None:
         """Botão de play: parada -> toca; tocando -> pausa; pausada -> retoma."""
-        if self._tocando:
-            self._ao_pausar_ou_retomar()
-        else:
-            self._ao_tocar()
+        acao = {
+            EstadoReproducao.PARADA: self._ao_tocar,
+            EstadoReproducao.TOCANDO: self._ao_pausar,
+            EstadoReproducao.PAUSADA: self._ao_retomar,
+        }[self.app.controlador.estado_reproducao()]
+        acao()
 
     def _ao_tocar(self) -> None:
         """Toca e agenda _verificar_fim com after(), sem travar a janela.
@@ -90,23 +106,19 @@ class TelaReproducao(tk.Frame):
         except GeradorMusicalErro as erro:
             self.app.mostrar_erro(str(erro))
             return
-        ja_estava_verificando = self._tocando
-        self._tocando = True
-        self._pausado = False
         self._mostrar_estado("tocando...")
-        if not ja_estava_verificando:           # evita duas verificações em paralelo
+        if self._id_verificacao is None:        # evita duas verificações em paralelo
             self._id_verificacao = self.after(self.INTERVALO_VERIFICACAO_MS, self._verificar_fim)
 
-    def _ao_pausar_ou_retomar(self) -> None:
-        """Alterna entre pausar e retomar (só se estiver tocando)."""
-        if not self._tocando:
-            return
-        if self._pausado:
-            self.app.controlador.retomar()
-        else:
-            self.app.controlador.pausar()
-        self._pausado = not self._pausado
-        self._mostrar_estado("pausada" if self._pausado else "tocando...")
+    def _ao_pausar(self) -> None:
+        """Pausa a música (o botão de play vira "retomar")."""
+        self.app.controlador.pausar()
+        self._mostrar_estado("pausada")
+
+    def _ao_retomar(self) -> None:
+        """Continua a música de onde pausou."""
+        self.app.controlador.retomar()
+        self._mostrar_estado("tocando...")
 
     def _ao_parar(self) -> None:
         """Para a música e zera os estados."""
@@ -114,8 +126,6 @@ class TelaReproducao(tk.Frame):
             self.after_cancel(self._id_verificacao)
             self._id_verificacao = None
         self.app.controlador.parar()
-        self._tocando = False
-        self._pausado = False
         self._mostrar_estado("parada")
 
     def _ao_baixar_midi(self) -> None:
@@ -155,7 +165,7 @@ class TelaReproducao(tk.Frame):
         laço while mantém a janela respondendo enquanto a música toca.
         """
         self._id_verificacao = None             # este agendamento já disparou
-        if not self._tocando:
+        if self.app.controlador.estado_reproducao() is EstadoReproducao.PARADA:
             return
         if self.app.controlador.reproducao_terminou():
             self._ao_parar()
@@ -169,22 +179,15 @@ class TelaReproducao(tk.Frame):
     def _mostrar_estado(self, texto: str) -> None:
         """Escreve o estado no canto e ajusta o botão de play.
 
-        O texto vira "tocar", "pausar" ou "retomar", e o ícone vira play ou
-        pausa.
+        O texto e o ícone do botão vêm de BOTAO_PLAY, conforme o estado da
+        reprodução: "tocar", "pausar" ou "retomar", com ícone de play ou pausa.
 
         Args:
             texto: estado a mostrar (ex.: "tocando...").
         """
         d = self.desenho
         d.itemconfig(self.rotulo_estado, text=texto)
-        tocando_agora = self._tocando and not self._pausado
-        if tocando_agora:
-            acao = "pausar"
-        elif self._pausado:
-            acao = "retomar"
-        else:
-            acao = "tocar"
+        acao, icone = self.BOTAO_PLAY[self.app.controlador.estado_reproducao()]
         d.itemconfig(self.rotulo_play, text=acao)
         d.delete(self.TAG_ICONE_PLAY)
-        d.icone("pausar" if tocando_agora else "tocar", Caixa(81, 442, 55, 55), estilo.PAINEL,
-                tags=(self._tag_play, self.TAG_ICONE_PLAY))
+        d.icone(icone, Caixa(81, 442, 55, 55), estilo.PAINEL, tags=(self._tag_play, self.TAG_ICONE_PLAY))

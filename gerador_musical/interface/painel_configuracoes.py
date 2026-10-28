@@ -13,7 +13,7 @@ from typing import Callable
 
 from gerador_musical.aplicacao.controlador_configuracao import ControladorConfiguracao
 from gerador_musical.interface import estilo
-from gerador_musical.interface.estilo import Caixa
+from gerador_musical.interface.desenho import Caixa, Desenho, Deslizador
 
 
 class PainelConfiguracoes:
@@ -36,7 +36,7 @@ class PainelConfiguracoes:
     PASSO_BPM = 10
     ITENS_POR_COLUNA = 10
 
-    def __init__(self, desenho: estilo.Desenho, configuracao: ControladorConfiguracao) -> None:
+    def __init__(self, desenho: Desenho, configuracao: ControladorConfiguracao) -> None:
         """Guarda onde desenhar e com quem falar (os controles nascem em construir()).
 
         Args:
@@ -46,8 +46,17 @@ class PainelConfiguracoes:
         self.desenho = desenho
         self.configuracao = configuracao
         self.voz_selecionada: int = 0
-        self._abas_voz: list[int] = []
+        self._abas_voz: list[int] = []                 # ids dos fundos das abas v0–v3
+        # ids dos textos que mudam ao trocar de voz (criados em construir())
+        self.rotulo_bpm: int | None = None
+        self.rotulo_oitava: int | None = None
+        self.rotulo_volume: int | None = None
+        self.rotulo_instrumento: int | None = None
+        self.deslizador_volume: Deslizador | None = None
+        # lista de instrumentos: menu, nomes e onde ela abre
+        self.menu_instrumentos: tk.Menu | None = None
         self._nome_por_programa: dict[int, str] = {}
+        self._posicao_lista: tuple[float, float] = (0, 0)
 
     def construir(self) -> None:
         """Desenha o painel e preenche os controles com os valores da v0."""
@@ -88,7 +97,7 @@ class PainelConfiguracoes:
         d.texto(x, y, "volume:", estilo.ESTILO_SECUNDARIO)
         self.rotulo_volume = d.texto(723, y, "", estilo.ESTILO_SECUNDARIO.com(ancora="ne"))
         d.icone("alto_falante", Caixa(x + 6.5, y + 60, 32, 62), estilo.FUNDO, espessura=3)
-        self.deslizador_volume = estilo.Deslizador(d, Caixa(122, y + 89, 601, 7), 0, self.VOLUME_MAXIMO,
+        self.deslizador_volume = Deslizador(d, Caixa(122, y + 89, 601, 7), 0, self.VOLUME_MAXIMO,
                                                    self._ao_mudar_volume)
 
     def _construir_contador(self, x: float, y: float, titulo: str,

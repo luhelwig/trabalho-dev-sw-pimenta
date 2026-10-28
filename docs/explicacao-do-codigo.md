@@ -96,7 +96,8 @@ gerador_musical/
     controlador.py              fluxo da música (texto, gerar, tocar, exportar)
     controlador_configuracao.py BPM e parâmetros iniciais de cada voz (Fase 3)
   interface/                    INTERFACE: telas em tkinter
-    estilo.py
+    estilo.py                   tema: cores, fonte, escala e estilos de texto
+    desenho.py                  Caixa, Desenho (Canvas), ícones e Deslizador (Fase 3)
     app.py
     tela_principal.py
     painel_configuracoes.py     painel de configurações da tela principal (Fase 3)
@@ -138,9 +139,9 @@ Essa organização é uma **arquitetura em camadas**, e a separação entre mode
 
 ### 3.1 O que acontece quando o usuário clica em "gerar música"
 
-1. **`TelaPrincipal._ao_gerar()`** lê o texto do campo com `get_texto()`.
-2. Se o texto é o mesmo da última geração, só os parâmetros mudaram: chama `controlador.regerar_com_novos_parametros()` (pula para o passo 6). Senão, chama `controlador.atualizar_texto(texto)` e `controlador.gerar_musica()`.
-3. **`ControladorAplicacao.gerar_musica()`** valida: se `entrada.esta_vazio()`, lança `TextoVazioErro("texto vazio")`; se `entrada.eh_formato_valido()` é falso, lança `FormatoInvalidoErro("formato incorreto")`.
+1. **`TelaPrincipal._ao_gerar()`** lê o texto do campo com `get_texto()` e chama `controlador.gerar_musica(texto)`.
+2. **`ControladorAplicacao.gerar_musica(texto)`**: se o texto é o mesmo da última geração, só os parâmetros mudaram, então chama `regerar_com_novos_parametros()` (pula para o passo 6). Senão, guarda o texto na entrada e chama `_interpretar_e_gerar()`.
+3. **`_interpretar_e_gerar()`** valida: se `entrada.esta_vazio()`, lança `TextoVazioErro("texto vazio")`; se `entrada.eh_formato_valido()` é falso, lança `FormatoInvalidoErro("formato incorreto")`.
 4. **`Parser.interpretar(texto)`** faz duas etapas:
    - `texto_to_token(texto)`: separa o texto em linhas e o `Tokenizador` quebra cada linha em tokens. O resultado fica guardado em `parser.tokens`.
    - `token_to_partitura()`: para cada linha, cria uma `Voz` com os parâmetros iniciais da `ConfiguracaoInicial` e passa cada token pelo `Mapeamento`, que escolhe a regra certa. As regras criam eventos (notas e pausas) e mudam parâmetros.
@@ -334,20 +335,34 @@ Mudança da Fase 1 para a Fase 2: antes existia um `ParametrosMusica` para a mú
 
 Os valores com que a música **começa**: o BPM global e, para cada voz, instrumento, oitava e volume iniciais. É esta classe que a tela altera quando o usuário mexe nas configurações. O Parser só lê dela.
 
-Constantes do módulo: `BPM_PADRAO = 120`; `INSTRUMENTOS_PADRAO = (CRAVO, ORGAO_DE_IGREJA, PIANO, FAGOTE)`; `OITAVAS_PADRAO = (6, 5, 4, 3)`; `VOLUMES_PADRAO = (100, 80, 60, 40)`. Constante da classe: `TAMANHO_DO_CICLO = 4`.
+`PadraoVoz` (Fase 3) é um objeto de valor imutável com os três valores com que uma voz começa: `instrumento`, `oitava` e `volume`.
+
+Constantes do módulo: `BPM_PADRAO = 120` e `PADROES_POR_VOZ`, uma tupla com um `PadraoVoz` por voz, escrita igual à tabela dos requisitos:
+
+```python
+PADROES_POR_VOZ = (
+    PadraoVoz(CRAVO, oitava=6, volume=100),             # V0
+    PadraoVoz(ORGAO_DE_IGREJA, oitava=5, volume=80),    # V1
+    PadraoVoz(PIANO, oitava=4, volume=60),              # V2
+    PadraoVoz(FAGOTE, oitava=3, volume=40),             # V3
+)
+```
+
+Constante da classe: `TAMANHO_DO_CICLO = len(PADROES_POR_VOZ)` (4). Até a Fase 2 eram três listas paralelas (instrumentos, oitavas e volumes), e para saber os valores da voz 2 era preciso olhar a terceira posição de cada uma (ver seção 10).
 
 | Função | O que faz |
 |--------|-----------|
-| `__init__(bpm_inicial)` | Guarda o BPM e carrega os padrões nas listas por voz. |
-| `_carregar_padroes()` | Copia as tuplas de padrão para listas (`list(...)`), que podem ser alteradas sem mexer nas constantes. |
+| `__init__(bpm_inicial)` | Guarda o BPM e copia `PADROES_POR_VOZ` para uma lista (`list(...)`), que pode ser alterada sem mexer na constante. |
+| `_padrao(i)` | O `PadraoVoz` da voz `i` (já com o ciclo de 4). Todos os `get_` usam este método. |
+| `_alterar_padrao(i, **mudanca)` | Troca um valor da voz `i`, ex.: `_alterar_padrao(1, oitava=5)`. Como `PadraoVoz` é imutável, `replace()` cria uma cópia com o valor trocado e ela entra no lugar da antiga. Todos os `set_` usam este método depois de validar. |
 | `_validar(valor, minimo, maximo, nome)` | Método estático que lança `ValueError` se o valor estiver fora do intervalo. É reaproveitado por todos os `set_`, então a validação fica num lugar só. |
 | `padrao()` | Fábrica: `ConfiguracaoInicial(BPM_PADRAO)`. |
 | `get_bpm_inicial()` / `set_bpm_inicial(bpm)` | Lê/altera o BPM (20 a 300). |
 | `get_instrumento_inicial(i)` / `set_instrumento_inicial(i, programa)` | Lê/altera o instrumento inicial da voz `i` (0 a 127). |
 | `get_oitava_inicial(i)` / `set_oitava_inicial(i, oitava)` | Lê/altera a oitava inicial da voz `i` (0 a 8). |
 | `get_volume_inicial(i)` / `set_volume_inicial(i, volume)` | Lê/altera o volume inicial da voz `i` (0 a 127). |
-| `criar_parametros(i)` | **Fábrica** de `ParametrosMusica`: cria um objeto **novo** com os valores iniciais da voz `i`. Por ser novo a cada chamada, os comandos do texto mudam a cópia e nunca estragam a configuração. |
-| `restaurar_padroes()` | Desfaz as mudanças do usuário. Hoje não há botão que use isso. |
+| `criar_parametros(i)` | **Fábrica** de `ParametrosMusica`: cria um objeto **novo** com os valores do `PadraoVoz` da voz `i`. Por ser novo a cada chamada, os comandos do texto mudam a cópia e nunca estragam a configuração. |
+| `restaurar_padroes()` | Desfaz as mudanças do usuário, copiando `PADROES_POR_VOZ` de novo. Hoje não há botão que use isso. |
 | `_indice_no_ciclo(i)` | `i % 4`. É o que faz a 5ª linha (voz 4) começar igual à 1ª, a 6ª igual à 2ª, e assim por diante. |
 
 #### `evento_musical.py`: `TipoEvento` e `EventoMusical`
@@ -641,19 +656,21 @@ Quem transforma o MIDI em som muda conforme o sistema: no Windows e no macOS é 
 
 Nos testes usamos um `BackendFalso` (em `tests/conftest.py`) que só anota as chamadas, então os testes rodam sem som e sem pygame tocando nada. Isso só é possível porque o Player depende da interface e não do pygame.
 
-#### `player.py`: `Player`
+#### `player.py`: `EstadoReproducao` e `Player`
 
-Controla a reprodução da música já gerada.
+`EstadoReproducao` (Fase 3) é um Enum com os três estados da reprodução: `PARADA`, `TOCANDO` e `PAUSADA`. Até a Fase 2 eram dois booleanos (`em_reproducao` e `pausado`), que juntos representavam três estados e ainda permitiam um quarto, sem sentido (pausado sem estar tocando). Pior: a `TelaReproducao` guardava uma cópia deles. Agora o estado existe num lugar só, o atributo `estado` do Player, e a tela pergunta ao controlador.
+
+`Player` controla a reprodução da música já gerada.
 
 | Função | O que faz |
 |--------|-----------|
-| `__init__(backend)` | Recebe o backend pronto. Começa sem música, sem tocar e sem pausa. |
+| `__init__(backend)` | Recebe o backend pronto. Começa sem música e com `estado = PARADA`. |
 | `carregar(musica)` | Para o que estiver tocando, guarda a música e grava o MIDI num arquivo temporário (`gerador_musical.mid` na pasta temporária do sistema), porque o pygame toca a partir de arquivo. |
-| `tocar()` | Se não há música, lança `MusicaNaoGeradaErro`. Senão, manda o backend carregar o arquivo e tocar do início. Tocar de novo **não** recria a música nem reinterpreta o texto. |
-| `parar()` | Para o backend e zera os estados. |
-| `pausar()` | Só pausa se está tocando e não está pausado. |
-| `retomar()` | Só retoma se está tocando e está pausado. |
-| `terminou()` | `True` quando estava tocando, não está pausado e o backend diz que parou. A checagem de "não pausado" é importante: o pygame também responde "não estou tocando" durante a pausa. |
+| `tocar()` | Se não há música, lança `MusicaNaoGeradaErro`. Senão, manda o backend carregar o arquivo e tocar do início, e passa para `TOCANDO`. Tocar de novo **não** recria a música nem reinterpreta o texto. |
+| `parar()` | Para o backend e volta para `PARADA`. |
+| `pausar()` | Só pausa se o estado é `TOCANDO` (e passa para `PAUSADA`). |
+| `retomar()` | Só retoma se o estado é `PAUSADA` (e volta para `TOCANDO`). |
+| `terminou()` | `True` quando o estado é `TOCANDO` e o backend diz que parou. Pausada não conta: o pygame também responde "não estou tocando" durante a pausa. |
 
 A reprodução é **assíncrona**: o pygame toca em segundo plano, e a interface continua respondendo enquanto a música toca.
 
@@ -689,13 +706,15 @@ O fluxo da música: texto → geração → reprodução → arquivo.
 | `carregar_arquivo(caminho)` | Carrega o .txt e devolve o texto para a tela mostrar no campo. |
 | `salvar_texto(caminho=None)` | Salva o texto (sobrescreve o original se veio de arquivo). |
 | `texto_veio_de_arquivo()` | Pergunta à entrada se o texto tem arquivo de origem. |
-| `limpar()` | Nova composição: para a música, esvazia a entrada e esquece a música gerada. |
-| `gerar_musica()` | Valida (vazio → `TextoVazioErro`; caractere inválido → `FormatoInvalidoErro`), interpreta o texto e chama `_sintetizar_e_carregar`. |
+| `limpar()` | Nova composição: para a música, esvazia a entrada e esquece a música e o texto gerados. |
+| `gerar_musica(texto)` | Se o texto é igual ao da última geração (`_texto_gerado`) e já existe música, só os parâmetros mudaram: chama `regerar_com_novos_parametros()`. Senão, guarda o texto na entrada, chama `_interpretar_e_gerar()` e lembra o texto. Até a Fase 2 essa decisão ficava na `TelaPrincipal` (ver seção 10, "Inveja de Recursos"). |
+| `_interpretar_e_gerar()` | Valida (vazio → `TextoVazioErro`; caractere inválido → `FormatoInvalidoErro`), interpreta o texto e chama `_sintetizar_e_carregar`. |
 | `regerar_com_novos_parametros()` | Chama só `parser.token_to_partitura()` (usa os tokens já lidos) e sintetiza de novo. É o requisito de mudar parâmetros sem reinterpretar o texto. |
 | `musica_foi_gerada()` | `True` se já existe música. |
 | `_sintetizar_e_carregar(partitura)` | Parte comum das duas anteriores: Partitura → MIDI → Player. |
 | `tocar()` / `pausar()` / `retomar()` / `parar()` | Repassam ao Player, que usa os mesmos nomes. |
 | `reproducao_terminou()` | `player.terminou()`. |
+| `estado_reproducao()` | O `EstadoReproducao` do Player. A tela de reprodução usa para saber o que o botão de play faz e mostra. `EstadoReproducao` é importado no `controlador.py` para fazer parte da interface pública da fachada, assim a tela não precisa importar nada da camada `saida`. |
 | `exportar_midi(destino=None)` | Se nada foi gerado, lança `MusicaNaoGeradaErro`; senão, pede ao exportador e devolve o caminho. |
 
 #### `controlador_configuracao.py`: `ControladorConfiguracao` (Fase 3)
@@ -721,11 +740,13 @@ A interface usa **tkinter**, que vem junto com o Python. O visual copia o croqui
 
 Como funciona uma interface gráfica: o programa monta as telas e entra no `mainloop()`, um laço que fica esperando **eventos** (clique, tecla, tempo passando). Cada botão tem uma função ligada a ele (um *callback*), chamada pelo tkinter quando o evento acontece. Por isso os métodos das telas se chamam `_ao_gerar`, `_ao_limpar`...: eles dizem **o que fazer ao** acontecer algo.
 
+O visual fica em dois arquivos: `estilo.py` é o **tema** (cores, fonte, escala e estilos de texto) e `desenho.py` são as **ferramentas de desenho** (Caixa, Canvas, ícones e deslizador). Até a Fase 2 era tudo no `estilo.py`: 388 linhas com cinco assuntos diferentes, que chegaram a quase 500 com a `Caixa` e o `EstiloTexto` (ver seção 10).
+
 #### `estilo.py`: o tema visual
 
-Cada tela é um **Canvas** (uma área de desenho) do tamanho do frame no Figma. As medidas no código são as mesmas do Figma (em pixels) e passam pela função `px()`, que multiplica pela escala. Assim, dá para conferir cada número no painel do Figma. Como o tkinter não tem cantos arredondados, botões e painéis são desenhados no Canvas, e o clique é ligado com `tag_bind`.
+As medidas no código são as mesmas do Figma (em pixels) e passam pela função `px()`, que multiplica pela escala. Assim, dá para conferir cada número no painel do Figma.
 
-Constantes: as cores do Figma (`FUNDO = "#467385"`, `CARTAO = "#a4cbd2"`, `PAINEL = "#ffe7cf"`, `ESCURO = "#071f36"`, `VERMELHO = "#900b09"`); a fonte (`FAMILIA = "Micro 5"`, `FAMILIA_RESERVA = "Courier New"`, `ARQUIVO_FONTE`); os tamanhos de texto do Figma (`TITULO = 78`, `TEXTO = 65`); e os dados da escala (`ALTURA_REFERENCIA = 1232`, a altura da tela mais alta; `FRACAO_DO_MONITOR = 0.85`; `MARGEM_MONITOR = 140`). `ICONES` guarda os ícones como desenhos numa grade 24×24 (linhas, círculos e arcos).
+Constantes: as cores do Figma (`FUNDO = "#467385"`, `CARTAO = "#a4cbd2"`, `PAINEL = "#ffe7cf"`, `ESCURO = "#071f36"`, `VERMELHO = "#900b09"`); a fonte (`FAMILIA = "Micro 5"`, `FAMILIA_RESERVA = "Courier New"`, `ARQUIVO_FONTE`); os tamanhos de texto do Figma (`TITULO = 78`, `TEXTO = 65`); e os dados da escala (`ALTURA_REFERENCIA = 1232`, a altura da tela mais alta; `FRACAO_DO_MONITOR = 0.85`; `MARGEM_MONITOR = 140`).
 
 Funções do módulo:
 
@@ -738,18 +759,7 @@ Funções do módulo:
 | `px(medida)` | Converte uma medida do Figma em pixels: `round(medida × escala)`. |
 | `fonte(tamanho)` | Devolve `(família, -tamanho_em_pixels)`. O tamanho **negativo** no tkinter significa pixels (positivo seria pontos). |
 
-Duas classes pequenas agrupam valores que antes viajavam soltos pelos métodos de desenho (Fase 3, ver seção 10, "Lista de Parâmetros Longa"). As duas são **objetos de valor** imutáveis (`@dataclass(frozen=True)`).
-
-`Caixa(x, y, largura, altura)`: um retângulo em px do Figma, do jeito que aparece no painel de propriedades do Figma.
-
-| Função | O que faz |
-|--------|-----------|
-| `centro` (propriedade) | O ponto do meio da caixa, `(x + largura/2, y + altura/2)`. Usado para centralizar o texto dos botões. |
-| `em_pixels()` | Os quatro cantos já convertidos por `px()`: `(esquerda, topo, direita, base)`, o formato que o Canvas pede. |
-| `ponto_da_grade(a, b, divisoes=24)` | Converte um ponto da grade 24×24 dos ícones para um ponto da tela dentro da caixa. |
-| `expandida(margem_x, margem_y)` | Uma caixa maior, com a margem em cada lado. Usado na área de clique do deslizador. |
-
-`EstiloTexto(tamanho, cor, ancora)`: como um texto aparece. A âncora diz qual ponto do texto fica na posição dada: `"nw"` canto superior esquerdo, `"n"` meio de cima, `"center"` meio, `"w"` meio da esquerda, `"ne"` canto superior direito. O método `com(**mudancas)` devolve uma cópia com algum valor trocado (ex.: `ESTILO_SECUNDARIO.com(ancora="ne")`). Estilos prontos, usados nas telas:
+`EstiloTexto(tamanho, cor, ancora)` (Fase 3) é um **objeto de valor** imutável (`@dataclass(frozen=True)`) que diz como um texto aparece. Antes eram três parâmetros soltos em cada chamada (ver seção 10, "Lista de Parâmetros Longa"). A âncora diz qual ponto do texto fica na posição dada: `"nw"` canto superior esquerdo, `"n"` meio de cima, `"center"` meio, `"w"` meio da esquerda, `"ne"` canto superior direito. O método `com(**mudancas)` devolve uma cópia com algum valor trocado (ex.: `ESTILO_SECUNDARIO.com(ancora="ne")`). Estilos prontos, usados nas telas:
 
 | Constante | Uso |
 |-----------|-----|
@@ -758,6 +768,20 @@ Duas classes pequenas agrupam valores que antes viajavam soltos pelos métodos d
 | `ESTILO_SECUNDARIO` | Rótulos azuis dentro dos painéis ("voz:", "volume:", "bpm:"...). |
 | `ESTILO_BOTAO` | Texto creme no meio de botões e pílulas. |
 | `ESTILO_VALOR` | Valor creme à esquerda de uma pílula (o número do bpm, o nome do instrumento). |
+
+#### `desenho.py`: as ferramentas de desenho (Fase 3)
+
+Cada tela é um **Canvas** (uma área de desenho) do tamanho do frame no Figma. Como o tkinter não tem cantos arredondados, botões e painéis são desenhados no Canvas, e o clique é ligado com `tag_bind`. `ICONES` guarda os ícones como desenhos numa grade 24×24: cada ícone é uma lista de partes `("linha", pontos...)`, `("circulo", cx, cy, raio)` ou `("arco", cx, cy, raio, início, extensão)`.
+
+`Caixa(x, y, largura, altura)` é um **objeto de valor** imutável: um retângulo em px do Figma, do jeito que aparece no painel de propriedades do Figma. Antes eram quatro números soltos em cada chamada (ver seção 10, "Lista de Parâmetros Longa").
+
+| Função | O que faz |
+|--------|-----------|
+| `centro` (propriedade) | O ponto do meio da caixa, `(x + largura/2, y + altura/2)`. Usado para centralizar o texto dos botões. |
+| `em_pixels()` | Os quatro cantos já convertidos por `px()`: `(esquerda, topo, direita, base)`, o formato que o Canvas pede. |
+| `ponto_da_grade(a, b, divisoes=24)` | Converte um ponto da grade 24×24 dos ícones para um ponto da tela dentro da caixa. |
+| `quadrado_da_grade(cx, cy, raio)` | Os cantos do quadrado que envolve um círculo da grade, o formato que `create_oval` e `create_arc` pedem. |
+| `expandida(margem_x, margem_y)` | Uma caixa maior, com a margem em cada lado. Usado na área de clique do deslizador. |
 
 `_contorno_arredondado(esquerda, topo, direita, base, raio)` é uma função auxiliar do módulo: calcula os pontos do polígono de cantos arredondados (cada canto é um quarto de círculo, com seno e cosseno de 15 em 15 graus).
 
@@ -769,7 +793,8 @@ Duas classes pequenas agrupam valores que antes viajavam soltos pelos métodos d
 | `retangulo(caixa, cor, raio=0, tags=())` | Retângulo de cantos arredondados (polígono de `_contorno_arredondado`). Com `raio=0`, um retângulo comum. |
 | `circulo(caixa, cor, tags=())` | Círculo (ou elipse) preenchido dentro da caixa. |
 | `texto(x, y, texto, estilo=ESTILO_ROTULO, tags=())` | Texto na fonte do tema, com o tamanho, a cor e a âncora do `EstiloTexto`. |
-| `icone(nome, caixa, cor, espessura, tags)` | Desenha um ícone de `ICONES` dentro da caixa, convertendo os pontos da grade 24×24 com `caixa.ponto_da_grade`. |
+| `icone(nome, caixa, cor, espessura, tags)` | Desenha um ícone de `ICONES` dentro da caixa. Uma **tabela** (dicionário) liga cada tipo de parte ao método que a desenha: `{"linha": self._parte_linha, "circulo": self._parte_circulo, "arco": self._parte_arco}`. Antes era um `if/else` testando o tipo (ver seção 10, "Switch Statements"). |
+| `_parte_linha` / `_parte_circulo` / `_parte_arco` | Desenham uma parte do ícone, convertendo os pontos da grade com a `Caixa`. |
 | `pintar(item, cor)` | Troca a cor de uma forma (usado para pintar a aba de voz selecionada). |
 | `widget(caixa, widget)` | Coloca um widget normal do tkinter (como o campo de texto) dentro da caixa, com `create_window`. |
 | `nova_tag()` | Gera um nome único (`clicavel1`, `clicavel2`...) para agrupar os itens de um botão: fundo, texto e ícone. |
@@ -813,7 +838,7 @@ Construção da tela:
 
 | Função | O que faz |
 |--------|-----------|
-| `__init__(app)` | Guarda o app e o texto da última geração (`None`). |
+| `__init__(app)` | Guarda o app; o Canvas, o campo, a dica e o painel começam `None` e nascem em `construir()`. |
 | `construir()` | Cria o `Desenho`, desenha cabeçalho e campo de texto, cria o `PainelConfiguracoes` (passando o Canvas e o `app.controlador_configuracao`) e manda ele se construir, e por fim desenha os botões. |
 | `_construir_cabecalho()` | Cartão azul-claro, botão redondo de upload (círculo + ícone, clicáveis juntos) e título. |
 | `_construir_campo_texto()` | Rótulo, pílula "salvar texto", fundo creme e o `tk.Text` (com `wrap="none"`, porque cada linha é uma voz e não pode quebrar sozinha; `undo=True` liga o Ctrl+Z). Cria também a dica "digite aqui...", um `Label` posicionado dentro do campo que aparece só quando ele está vazio. |
@@ -824,10 +849,10 @@ Eventos (o que acontece quando o usuário interage):
 | Função | O que faz |
 |--------|-----------|
 | `_ao_abrir_carregamento()` | Mostra a tela de upload. |
-| `_ao_gerar()` | Pega o texto. Se é igual ao da última geração e já existe música, chama `regerar_com_novos_parametros()`; senão, atualiza o texto e chama `gerar_musica()`. Em erro, mostra a mensagem e fica na tela; em sucesso, guarda o texto gerado e vai para a reprodução. |
-| `_ao_limpar()` | Limpa o controlador e o campo, e esquece o texto gerado. |
+| `_ao_gerar()` | Chama `controlador.gerar_musica(texto)` (é o controlador que decide se só regera). Em erro, mostra a mensagem e fica na tela; em sucesso, vai para a reprodução. |
+| `_ao_limpar()` | Limpa o controlador e o campo. |
 | `_ao_salvar_texto()` | Atualiza o texto no controlador. Se veio de arquivo, salva direto; senão, abre "salvar como" (se o usuário cancelar, não faz nada). Mostra onde salvou ou o erro. |
-| `_ao_modificar_texto(evento)` | Chamado pelo evento `<<Modified>>` do campo. Rearma o evento (`edit_modified(False)`, senão ele só dispara uma vez) e atualiza a dica. |
+| `_ao_modificar_texto(_evento)` | Chamado pelo evento `<<Modified>>` do campo (o `_` no nome do argumento indica que ele não é usado; o tkinter sempre passa o evento). Rearma o evento (`edit_modified(False)`, senão ele só dispara uma vez) e atualiza a dica. |
 | `_atualizar_dica()` | Esconde a dica se há texto, mostra se o campo está vazio. |
 | `set_texto(texto)` | Troca todo o conteúdo do campo (usado depois de carregar um .txt). |
 | `get_texto()` | Lê o campo de `"1.0"` (linha 1, coluna 0) até `"end-1c"`: o `-1c` tira o `\n` que o tkinter sempre acrescenta no fim. |
@@ -840,7 +865,7 @@ Constantes: `NUMERO_DE_VOZES = 4`, `VOLUME_MAXIMO = 100` (fim do deslizador, dec
 
 | Função | O que faz |
 |--------|-----------|
-| `__init__(desenho, configuracao)` | Guarda o Canvas e o controlador; começa na voz 0. |
+| `__init__(desenho, configuracao)` | Guarda o Canvas e o controlador, começa na voz 0 e declara (com `None`) os atributos dos controles, que nascem em `construir()`. Assim dá para ver no `__init__` tudo o que a classe guarda. |
 | `construir()` | Rótulo "configurações:", painel creme e os controles: seletor de voz, volume, bpm, instrumento e oitava. No fim seleciona a voz 0 para preencher os controles. |
 | `_construir_seletor_voz(x, y)` | Rótulo "voz:" e quatro botões `v0`–`v3`. Guarda os ids dos fundos para pintar a aba selecionada. O `lambda i=i:` congela o valor de `i` em cada botão (sem o `i=i`, todos os botões usariam o último valor do laço). |
 | `_construir_volume(x, y)` | Rótulo, valor numérico, ícone de alto-falante e o `Deslizador` de 0 a `VOLUME_MAXIMO`. |
@@ -871,22 +896,24 @@ Frame "upload botton" do Figma. Constantes: `LARGURA, ALTURA = 813, 527`.
 
 Frame "Gerador de musica" do Figma. Aparece depois de gerar. Novidades da Fase 2: o play vira pausar/retomar, a pílula "parar", o estado no canto e o aviso de fim.
 
-Constantes: `INTERVALO_VERIFICACAO_MS = 200`, `LARGURA, ALTURA = 813, 586`, `TAG_ICONE_PLAY`. Estados: `_tocando` e `_pausado`.
+A tela **não guarda** se a música está tocando: ela pergunta ao controlador (`estado_reproducao()`), que pergunta ao Player. Até a Fase 2 ela tinha os booleanos `_tocando` e `_pausado`, uma cópia do estado que já existia no Player (ver seção 10). O único estado próprio da tela é `_id_verificacao`, o agendamento do `after()` que confere se a música acabou.
+
+Constantes: `INTERVALO_VERIFICACAO_MS = 200`, `LARGURA, ALTURA = 813, 586`, `TAG_ICONE_PLAY` e `BOTAO_PLAY`, uma tabela que diz, para cada `EstadoReproducao`, o texto e o ícone do botão de play: parada → ("tocar", ícone de play); tocando → ("pausar", ícone de pausa); pausada → ("retomar", ícone de play).
 
 | Função | O que faz |
 |--------|-----------|
-| `__init__(app)` | Guarda o app e começa parada. |
+| `__init__(app)` | Guarda o app; os rótulos nascem em `construir()`. |
 | `construir()` | Cartão, título, "música gerada!", texto de estado, painel, "baixar midi", "salvar como...", botão de play (círculo + pílula, que fazem a mesma coisa), "parar" e "voltar". |
-| `_ao_tocar_ou_pausar()` | O botão de play tem três papéis: parado → toca; tocando → pausa; pausado → retoma. |
-| `_ao_tocar()` | Pede ao controlador para tocar (em erro, mostra a mensagem). Marca como tocando e agenda `_verificar_fim` com `after()`, só se ainda não havia uma verificação rodando. |
-| `_ao_pausar_ou_retomar()` | Alterna entre pausar e retomar e atualiza o estado. |
-| `_ao_parar()` | Para a música e zera os estados. |
+| `_ao_tocar_ou_pausar()` | O botão de play tem três papéis, escolhidos por uma tabela a partir do estado: parada → `_ao_tocar`; tocando → `_ao_pausar`; pausada → `_ao_retomar`. |
+| `_ao_tocar()` | Pede ao controlador para tocar (em erro, mostra a mensagem). Mostra "tocando..." e agenda `_verificar_fim` com `after()`, só se ainda não havia uma verificação agendada. |
+| `_ao_pausar()` / `_ao_retomar()` | Pedem ao controlador para pausar ou retomar e atualizam o texto do estado. |
+| `_ao_parar()` | Cancela a verificação agendada e para a música. |
 | `_ao_baixar_midi()` | Exporta para Downloads com o nome padrão. |
 | `_ao_salvar_midi_como()` | Abre "salvar como" para .mid e exporta no lugar escolhido. |
 | `_exportar_midi(destino)` | Parte comum das duas anteriores: chama o controlador e mostra onde salvou ou o erro. |
 | `_ao_voltar()` | Para a música, volta o estado para "pronta para tocar" e mostra a tela principal. |
-| `_verificar_fim()` | Se não está mais tocando, para de verificar. Se a música acabou, para, mostra "fim" e avisa o usuário; senão, agenda a si mesmo de novo daqui a 200 ms. É um *polling* que não trava a interface. |
-| `_mostrar_estado(texto)` | Escreve o estado no canto e ajusta o botão de play: texto "tocar", "pausar" ou "retomar", e ícone de play ou de pausa (apaga o ícone antigo pela tag e desenha o novo). |
+| `_verificar_fim()` | Se a música está parada, para de verificar. Se a música acabou, para, mostra "fim" e avisa o usuário; senão, agenda a si mesmo de novo daqui a 200 ms. É um *polling* que não trava a interface. |
+| `_mostrar_estado(texto)` | Escreve o estado no canto e ajusta o botão de play com o texto e o ícone de `BOTAO_PLAY` para o estado atual (apaga o ícone antigo pela tag e desenha o novo). |
 
 Por que `after()` e não um laço `while`? Um `while` esperando a música acabar travaria o `mainloop`, e a janela pararia de responder. Com `after()`, o tkinter chama a verificação de tempos em tempos e continua atendendo os cliques no meio.
 
@@ -894,7 +921,7 @@ Por que `after()` e não um laço `while`? Um `while` esperando a música acabar
 
 ## 5. Testes
 
-Os testes ficam em `tests/` e usam o **pytest**. Para rodar todos: `pytest` na pasta do projeto (hoje são **86 testes, todos passando**). Para rodar só um arquivo: `pytest tests/test_parser.py`; só os testes com uma palavra no nome: `pytest -k oitava`.
+Os testes ficam em `tests/` e usam o **pytest**. Para rodar todos: `pytest` na pasta do projeto (hoje são **90 testes, todos passando**). Para rodar só um arquivo: `pytest tests/test_parser.py`; só os testes com uma palavra no nome: `pytest -k oitava`.
 
 O `pyproject.toml` diz ao pytest onde estão os testes (`testpaths = ["tests"]`) e que a pasta do projeto entra no caminho de importação (`pythonpath = ["."]`), por isso os testes conseguem fazer `from gerador_musical...`.
 
@@ -902,26 +929,27 @@ O `pyproject.toml` diz ao pytest onde estão os testes (`testpaths = ["tests"]`)
 
 | Arquivo | Testes | O que verifica |
 |---------|--------|----------------|
-| `test_musica.py` | 23 | `Duracao` (conversão 1–7, identificador inválido dá erro, cada figura vale metade da anterior); `NotaMusical` (Dó4 = 60, Lá4 = 69, sustenido e bemol); `ParametrosMusica` (dobrar volume, limite 127, oitava que passa do máximo volta ao padrão, descer oitava, voltar ao instrumento inicial, somar ao instrumento passando de 127 volta ao começo); `ConfiguracaoInicial` (padrões por voz, ciclo de 4 vozes, mudança do usuário aparece em `criar_parametros`); `Partitura` (`bpm_em` acumula mudanças, respeita limites, duração total conta o atraso); catálogo com pelo menos 25 instrumentos e com todos os obrigatórios. |
+| `test_musica.py` | 24 | `Duracao` (conversão 1–7, identificador inválido dá erro, cada figura vale metade da anterior); `NotaMusical` (Dó4 = 60, Lá4 = 69, sustenido e bemol); `ParametrosMusica` (dobrar volume, limite 127, oitava que passa do máximo volta ao padrão, descer oitava, voltar ao instrumento inicial, somar ao instrumento passando de 127 volta ao começo); `ConfiguracaoInicial` (padrões por voz, ciclo de 4 vozes, mudança do usuário aparece em `criar_parametros`, mudar uma voz não mexe nas outras, `restaurar_padroes`); `Partitura` (`bpm_em` acumula mudanças, respeita limites, duração total conta o atraso); catálogo com pelo menos 25 instrumentos e com todos os obrigatórios. |
 | `test_tokenizador.py` | 11 | Linha vazia, nota com e sem duração, sustenido, bemol, `b` sozinho é caractere, atraso só no início, dígito solto, `A:9` e o exemplo do enunciado `[4] C:2 D:2 E:3`. |
 | `test_regras.py` | 13 | Cada regra isolada: nota usa os parâmetros da voz e a duração padrão; pausa; repetir quando o anterior era nota e pausar quando não era; volume; oitava; instrumento fixo; soma do dígito; atraso; andamento registrado na posição certa. E o `Mapeamento`: usa a regra padrão quando nenhuma aceita, e aceita uma regra nova sem mudar código. |
 | `test_parser.py` | 7 | Integração Tokenizador + Mapeamento + Parser: cada linha vira uma voz, vozes começam com os padrões, atraso, andamento vale para todas as vozes, a nota anterior não passa de uma linha para outra, regerar sem reler o texto, caracteres estranhos não quebram o programa. |
 | `test_entrada_usuario.py` | 8 | Texto só com espaços é vazio, alfabeto estrangeiro é inválido, acentos são válidos, carregar .txt, recusar arquivo que não é .txt, salvar por cima do original, salvar sem origem dá erro, `foi_modificado`. |
-| `test_saida.py` | 12 | Sintetizador (uma trilha de andamento + uma por voz, `note_on`/`note_off` com volume e duração certos, `program_change` ao trocar instrumento, atraso em ticks, `set_tempo` ao mudar andamento, nenhuma voz no canal 9); Exportador (grava na pasta configurada e o arquivo pode ser lido de volta); Player (erro sem música, chamadas ao backend na ordem certa, tocar de novo não recria a música, pausado não conta como "terminou"). |
-| `test_controladores.py` | 12 | **Fase 3.** `ControladorConfiguracao` (lista os 30 instrumentos, altera os valores da voz, valores fora do limite dão `ValueError`); `ControladorAplicacao` montado como no `main.py`, mas com backend falso (texto vazio, formato incorreto, exportar sem gerar, gerar + tocar + exportar, regerar usa o BPM novo do painel, limpar para a música). Servem de "rede de segurança" da refatoração: garantem que separar o controlador não mudou o comportamento. |
+| `test_saida.py` | 13 | Sintetizador (uma trilha de andamento + uma por voz, `note_on`/`note_off` com volume e duração certos, `program_change` ao trocar instrumento, atraso em ticks, `set_tempo` ao mudar andamento, nenhuma voz no canal 9); Exportador (grava na pasta configurada e o arquivo pode ser lido de volta); Player (erro sem música, chamadas ao backend na ordem certa, tocar de novo não recria a música, os estados `PARADA`/`TOCANDO`/`PAUSADA`, pausado não conta como "terminou"). |
+| `test_controladores.py` | 14 | **Fase 3.** `ControladorConfiguracao` (lista os 30 instrumentos, altera os valores da voz, valores fora do limite dão `ValueError`); `ControladorAplicacao` montado como no `main.py`, mas com backend falso (texto vazio, formato incorreto, exportar sem gerar, gerar + tocar + exportar, **mesmo texto regera sem reinterpretar** e usa o BPM novo do painel, texto diferente é interpretado de novo, limpar para a música, estado da reprodução). Servem de "rede de segurança" da refatoração: garantem que separar o controlador não mudou o comportamento. |
 
 ### Técnicas usadas
 
 - **Teste unitário × teste de integração.** `test_regras.py` testa cada regra sozinha (unitário). `test_parser.py` e `test_saida.py` usam várias peças reais juntas (integração).
-- **Fixtures** (`tests/conftest.py`). O pytest entrega objetos prontos para os testes que os pedem pelo nome do parâmetro: `contexto` (uma voz com cravo, oitava 6, volume 40, numa partitura de 120 bpm) e `backend` (o backend falso). O `conftest.py` é lido automaticamente pelo pytest.
+- **Fixtures** (`tests/conftest.py` e no começo de `test_controladores.py`). O pytest entrega objetos prontos para os testes que os pedem pelo nome do parâmetro: `contexto` (uma voz com cravo, oitava 6, volume 40, numa partitura de 120 bpm) e `backend` (o backend falso). O `conftest.py` é lido automaticamente pelo pytest.
 - **Dublês de teste (*test doubles*).** O `BackendFalso` finge ser o pygame e só anota as chamadas. Assim testamos o Player sem tocar som. Isso só funciona porque o Player depende da interface `BackendAudio`.
 - **`@pytest.mark.parametrize`.** Roda o mesmo teste com vários valores (ex.: identificadores 1, 3 e 7).
 - **`pytest.raises`.** Verifica que um erro **é** lançado quando deveria.
+- **`monkeypatch`.** Fixture do pytest que troca um método só durante o teste. Em `test_controladores.py` ela "espiona" o `Parser.interpretar` para contar quantas vezes o texto foi interpretado.
 - **`tmp_path`.** Fixture do próprio pytest que dá uma pasta temporária, para testar leitura e gravação de arquivos sem sujar o computador.
 
 ### O que não tem teste automático
 
-A interface (telas tkinter) e o `BackendPygame` (som de verdade) não têm testes automáticos: dependem de janela e de placa de som. Eles são testados à mão, rodando o programa. Na Fase 3, para conferir que a refatoração da interface não mudou nada, rodamos as telas antes e depois, clicando nos mesmos lugares, e comparamos as capturas de tela: ficaram idênticas.
+A interface (telas tkinter) e o `BackendPygame` (som de verdade) não têm testes automáticos: dependem de janela e de placa de som. Eles são testados à mão, rodando o programa. Na Fase 3, para conferir que a refatoração da interface não mudou nada, rodamos as telas antes e depois, clicando nos mesmos lugares, e comparamos as capturas de tela: ficaram idênticas. Também conferimos pela interface os caminhos tocar → pausar → retomar → fim da música e "gerar de novo com o mesmo texto", com o mesmo resultado antes e depois.
 
 ---
 
@@ -941,7 +969,7 @@ A interface (telas tkinter) e o `BackendPygame` (som de verdade) não têm teste
 
 | Princípio | O que diz | Onde aparece |
 |-----------|-----------|--------------|
-| **S**: Responsabilidade Única | Uma classe deve ter um único motivo para mudar. | `ArquivoTexto` (disco) separado de `EntradaUsuario` (regras do texto); `Tokenizador` (forma) separado do `Parser` (significado); `Sintetizador` (gerar MIDI) separado do `ExportadorMidi` (gravar) e do `Player` (tocar). Na Fase 3: `ControladorAplicacao` (fluxo da música) separado do `ControladorConfiguracao` (parâmetros), e `TelaPrincipal` (texto e botões) separada do `PainelConfiguracoes`. |
+| **S**: Responsabilidade Única | Uma classe deve ter um único motivo para mudar. | `ArquivoTexto` (disco) separado de `EntradaUsuario` (regras do texto); `Tokenizador` (forma) separado do `Parser` (significado); `Sintetizador` (gerar MIDI) separado do `ExportadorMidi` (gravar) e do `Player` (tocar). Na Fase 3: `ControladorAplicacao` (fluxo da música) separado do `ControladorConfiguracao` (parâmetros), `TelaPrincipal` (texto e botões) separada do `PainelConfiguracoes`, e `estilo.py` (tema) separado de `desenho.py` (ferramentas de desenho). |
 | **O**: Aberto/Fechado | Aberto para extensão, fechado para modificação. | Para criar um comando novo, escreve-se uma regra nova e ela entra em `Mapeamento.padrao()` ou por `adicionar_regra()`. O `Parser` e o `Mapeamento` não mudam. O teste `test_mapeamento_aceita_regra_nova_sem_mudar_codigo` demonstra isso. O mesmo vale para um novo formato de exportação (nova subclasse de `Exportador`) ou um novo jeito de tocar som (nova subclasse de `BackendAudio`). |
 | **L**: Substituição de Liskov | Uma subclasse deve poder substituir a classe mãe sem quebrar nada. | Qualquer `RegraMapeamento` funciona no lugar de outra para o `Mapeamento`; o `BackendFalso` substitui o `BackendPygame` no `Player`; `ExportadorMidi` substitui `Exportador` no controlador. |
 | **I**: Segregação de Interfaces | Interfaces pequenas, específicas. | `RegraMapeamento` tem só dois métodos (`aceita` e `aplicar`); `Exportador` tem um (`exportar`); `BackendAudio` tem só o que o Player usa. |
@@ -956,9 +984,10 @@ A interface (telas tkinter) e o `BackendPygame` (som de verdade) não têm teste
 | **Fachada (Facade)** | `ControladorAplicacao` e `ControladorConfiguracao` | Uma interface simples para um sistema com muitas peças. As telas chamam `gerar_musica()` e não precisam saber que isso envolve entrada, parser, sintetizador e player. São duas fachadas pequenas em vez de uma grande, cada uma para um assunto. |
 | **Adaptador (Adapter)** | `BackendPygame` | Adapta a API do pygame (`play`, `unpause`, `get_busy`) à interface que o sistema espera (`tocar`, `retomar`, `esta_tocando`). |
 | **Método de fábrica (Factory Method)** | `Mapeamento.padrao()`, `ConfiguracaoInicial.padrao()`, `CatalogoInstrumentos.padrao()`, `EventoMusical.criar_nota()`/`criar_pausa()`, `ConfiguracaoInicial.criar_parametros()`, `Duracao.from_identificador()` | Criar objetos já configurados, com um nome que explica o que está sendo criado. |
-| **Objeto de valor (Value Object)** | `NotaMusical`, `Instrumento`, `Token`, `MudancaAndamento`, e na interface `Caixa` e `EstiloTexto` (dataclasses `frozen`) | Objetos imutáveis comparados pelo conteúdo. Não podem ser alterados por engano depois de criados. |
+| **Objeto de valor (Value Object)** | `NotaMusical`, `Instrumento`, `Token`, `MudancaAndamento`, `PadraoVoz`, e na interface `Caixa` e `EstiloTexto` (dataclasses `frozen`) | Objetos imutáveis comparados pelo conteúdo. Não podem ser alterados por engano depois de criados. |
 | **Injeção de dependência + Composition Root** | construtores de `Parser`, `Player`, `ControladorAplicacao`, `ControladorConfiguracao`, `ExportadorMidi`; `main.criar_controladores()` | Cada classe recebe o que precisa em vez de criar sozinha, e só o `main.py` decide as peças concretas. Facilita testes e trocas. |
 | **MVC / camadas** | `musica` (modelo), `interface` (visão), `aplicacao` (controle) | Separar dados e regras da apresentação. |
+| **Tabela de despacho** (dicionário de funções no lugar de `if/elif`) | `Desenho.icone` (tipo de parte → método), `TelaReproducao._ao_tocar_ou_pausar` (estado → ação) e `BOTAO_PLAY` (estado → texto e ícone) | Trocar uma cadeia de condicionais por uma consulta numa tabela. Um caso novo é uma linha nova na tabela. É a versão pequena do mesmo princípio do Strategy. |
 | **Programação orientada a eventos** | telas tkinter (`_ao_...`, `mainloop`, `after`) | A interface reage a eventos (clique, tempo) em vez de seguir um roteiro fixo. |
 
 ### 6.5 Herança, polimorfismo e classes abstratas
@@ -977,7 +1006,7 @@ A interface (telas tkinter) e o `BackendPygame` (som de verdade) não têm teste
 ### 6.7 Outras boas práticas
 
 - **Constantes nomeadas** em vez de números mágicos (`limites.py`, `TICKS_POR_BEAT`, `PASSO_BPM`, `CANAL_PERCUSSAO_MIDI`).
-- **Enums** para conjuntos fechados de valores (`Duracao`, `Acidente`, `TipoToken`, `TipoEvento`).
+- **Enums** para conjuntos fechados de valores (`Duracao`, `Acidente`, `TipoToken`, `TipoEvento`, `EstadoReproducao`).
 - **Anotações de tipo** (`def bpm_em(self, posicao_beats: float) -> int`), que documentam o código e ajudam a IDE a achar erros.
 - **Docstrings** no padrão do pydoc, explicando o porquê das decisões e marcando o que mudou da Fase 1 para a Fase 2 e o que foi refatorado na Fase 3.
 - **Cópias defensivas** (`list(self.vozes)`) e **foto dos parâmetros** nos eventos, para evitar *aliasing* (dois lugares mexendo no mesmo objeto sem querer).
@@ -1020,7 +1049,7 @@ O enunciado pede para **re-projetar acrescentando classes às da Fase 1**. Foi o
 | Mudança 4: `>` e `<` mudam o BPM da música toda | `RegraAndamento`, `MudancaAndamento`, `Partitura.bpm_em`, trilha de andamento |
 | Mudança 4: `?` sobe e `V` desce a oitava | `RegraOitava`, `ParametrosMusica` |
 | Mensagens "texto vazio" e "formato incorreto" | `ControladorAplicacao.gerar_musica`, `EntradaUsuario`, exceções |
-| Alterar parâmetros e gerar de novo sem reinterpretar o texto | `PainelConfiguracoes` + `ControladorConfiguracao`; `Parser.token_to_partitura` com tokens guardados; `regerar_com_novos_parametros`; `TelaPrincipal._ao_gerar` |
+| Alterar parâmetros e gerar de novo sem reinterpretar o texto | `PainelConfiguracoes` + `ControladorConfiguracao`; `Parser.token_to_partitura` com tokens guardados; `ControladorAplicacao.gerar_musica(texto)` e `regerar_com_novos_parametros`; teste `test_mesmo_texto_regera_sem_reinterpretar` |
 | Pausar, retomar e parar; aviso de fim | `Player`, `TelaReproducao` (`_verificar_fim` com `after`) |
 | Interface não trava enquanto toca | reprodução assíncrona do pygame + `after()` em vez de laço |
 | Mapeamento fácil de mudar | regras como classes + `Mapeamento.padrao()` como único lugar da tabela |
@@ -1030,7 +1059,7 @@ O enunciado pede para **re-projetar acrescentando classes às da Fase 1**. Foi o
 
 ## 8. Pontos de atenção e pequenas melhorias
 
-Já arrumado: os docstrings desatualizados e os "TODO" de decisões já tomadas (na revisão do pydoc), e, na Fase 3, o import sem uso em `nota_musical.py`, a docstring duplicada em `CatalogoInstrumentos.padrao()`, o `== True` em `contexto.py`, o atributo `Sintetizador.partitura` que nunca era lido e as funções `Voz.ultima_nota` e `Token.eh_caractere`, que não eram usadas nem nos testes.
+Já arrumado: os docstrings desatualizados e os "TODO" de decisões já tomadas (na revisão do pydoc), e, na Fase 3, o import sem uso em `nota_musical.py`, a docstring duplicada em `CatalogoInstrumentos.padrao()`, o `== True` em `contexto.py`, o atributo `Sintetizador.partitura` que nunca era lido as funções `Voz.ultima_nota` e `Token.eh_caractere`, que não eram usadas nem nos testes, e imports sem uso em alguns testes. A seção 10 tem a lista completa do que mudou na Fase 3.
 
 O que ainda vale o grupo decidir (nenhum item quebra o programa):
 
@@ -1062,7 +1091,7 @@ Porque os parâmetros da voz mudam enquanto o texto é lido. O evento guarda uma
 Porque as linhas são interpretadas uma de cada vez. Uma mudança na linha 2 pode acontecer **antes**, no tempo, de uma mudança na linha 1. Só depois de juntar e ordenar todas é possível calcular o BPM de cada ponto (`Partitura.bpm_em`).
 
 **Como funciona o "gerar de novo sem reinterpretar o texto"?**
-O Parser guarda os tokens. Se o texto não mudou, a tela chama `regerar_com_novos_parametros()`, que roda só `token_to_partitura()` com a `ConfiguracaoInicial` atualizada.
+O Parser guarda os tokens. Em `ControladorAplicacao.gerar_musica(texto)`, se o texto é o mesmo da última geração, o controlador chama `regerar_com_novos_parametros()`, que roda só `token_to_partitura()` com a `ConfiguracaoInicial` atualizada. Há um teste que confere que o texto foi interpretado uma vez só.
 
 **Para que servem os controladores?**
 São as fachadas: a interface só fala com eles. Isso desacopla as telas do resto. Trocar tkinter por outra interface não exige mexer na interpretação nem na saída. São dois porque são dois assuntos: o `ControladorAplicacao` cuida do fluxo da música e o `ControladorConfiguracao` dos parâmetros iniciais (antes era um só, com 23 métodos públicos).
@@ -1086,7 +1115,7 @@ No padrão General MIDI, o canal 10 (índice 9) é reservado para bateria: qualq
 É a menor unidade de tempo do arquivo MIDI. 480 por beat é um valor comum, e com ele todas as durações do enunciado (até a semifusa, 1/16 de beat = 30 ticks) dão números inteiros.
 
 **Como vocês testaram?**
-86 testes automáticos com pytest: unitários (regras, modelo musical, tokenizador) e de integração (parser, sintetizador, exportador, controladores). O som é testado com um dublê (`BackendFalso`). A interface foi testada rodando o programa.
+90 testes automáticos com pytest: unitários (regras, modelo musical, tokenizador) e de integração (parser, sintetizador, exportador, controladores). O som é testado com um dublê (`BackendFalso`). A interface foi testada rodando o programa.
 
 **Usaram código de terceiros?**
 As bibliotecas mido (gerar o MIDI) e pygame-ce (tocar), a tkinter (que vem com o Python) e a fonte Micro 5 (licença OFL). Está tudo listado no README.
@@ -1095,55 +1124,85 @@ As bibliotecas mido (gerar o MIDI) e pygame-ce (tocar), a tkinter (que vem com o
 
 ## 10. Fase 3: bad smells e refatorações
 
-Na Fase 3, outro grupo vai revisar o nosso código usando o checklist de 10 bad smells do professor. O próprio checklist sugere que o grupo autor faça uma **autoavaliação** antes de entregar o código. Foi o que fizemos: passamos os 10 smells no código e usamos as ferramentas que o enunciado recomenda para Python, o **Radon** (complexidade) e o **Pylint** (avisos de design como "muitos argumentos" e "muitos métodos públicos").
+Na Fase 3, outro grupo vai revisar o nosso código usando o checklist de 10 bad smells do professor. O próprio checklist sugere que o grupo autor faça uma **autoavaliação** antes de entregar o código. Foi o que fizemos, em duas passadas: passamos os 10 smells no código e usamos as ferramentas que o enunciado recomenda para Python, o **Radon** (complexidade ciclomática e índice de manutenibilidade) e o **Pylint** (avisos de design como "muitos argumentos" e "muitos atributos").
 
-**Refatorar** é mudar a estrutura do código sem mudar o que ele faz. Para garantir que nada mudou: os 73 testes que já existiam continuam passando (agora são 86, com os novos), e as telas foram rodadas antes e depois, clicando nos mesmos lugares, com capturas de tela idênticas.
+**Refatorar** é mudar a estrutura do código sem mudar o que ele faz. Para garantir que nada mudou:
+
+- os 73 testes que já existiam continuam passando (agora são 90, com os novos);
+- as telas foram rodadas antes e depois, clicando nos mesmos lugares, e as capturas de tela ficaram idênticas, pixel a pixel;
+- os caminhos tocar → pausar → retomar → fim da música e "gerar de novo com o mesmo texto" foram conferidos pela interface, com o mesmo resultado antes e depois.
 
 ### 10.1 Checklist dos 10 smells
 
 | # | Smell | Resultado | Onde estava e o que fizemos |
 |---|-------|-----------|-----------------------------|
-| 1 | Código Duplicado | **Refatorado** | `TelaPrincipal._ao_mudar_bpm` e `_ao_mudar_oitava` repetiam o mesmo `try / except ValueError / atualizar controles`. **Extrair Método**: virou `PainelConfiguracoes._alterar`, usado também na escolha de instrumento. A conversão dos quatro cantos de um retângulo para pixels (`px(x), px(y), px(x + largura), px(y + altura)`) aparecia em `retangulo`, `circulo` e no `Deslizador`; agora é `Caixa.em_pixels()`. O mapeamento texto → música não tem duplicação: cada comando é uma regra, e regras parecidas são a mesma classe com parâmetros (`RegraOitava("?", +1)` e `RegraOitava("V", -1)`). |
-| 2 | Classe Grande | **Refatorado** | `ControladorAplicacao` tinha 23 métodos públicos (fluxo da música + ajuste de parâmetros). **Extrair Classe**: os 9 métodos de parâmetros foram para o `ControladorConfiguracao`. `TelaPrincipal` tinha 25 métodos, 15 atributos e 337 linhas (texto + todo o painel). **Extrair Classe**: o painel virou `PainelConfiguracoes`, e a tela ficou com 13 métodos, 6 atributos e 168 linhas. |
-| 3 | Método Longo | OK | Nenhum método com lógica passa de 20 linhas. O mais longo é `CatalogoInstrumentos.padrao()` (32 linhas), mas ele é só a lista dos 30 instrumentos, sem nenhum `if` ou laço. A maior complexidade ciclomática do projeto (Radon) é 6, em `Desenho.icone` (nota B; todo o resto é nota A). |
+| 1 | Código Duplicado | **Refatorado** | `TelaPrincipal._ao_mudar_bpm` e `_ao_mudar_oitava` repetiam o mesmo `try / except ValueError / atualizar controles`. **Extrair Método**: virou `PainelConfiguracoes._alterar`, usado também na escolha de instrumento. A conversão dos quatro cantos de um retângulo para pixels aparecia em `retangulo`, `circulo` e no `Deslizador`; agora é `Caixa.em_pixels()`. **Dado duplicado**: o estado da reprodução existia no `Player` e de novo na `TelaReproducao` (`_tocando`, `_pausado`); agora existe só no Player (ver item 6). O detector de duplicação do Pylint não acha nenhum trecho repetido, nem com o mínimo baixado para 4 linhas. |
+| 2 | Classe Grande | **Refatorado** | `ControladorAplicacao` tinha 23 métodos públicos (fluxo da música + ajuste de parâmetros). **Extrair Classe**: os 9 métodos de parâmetros foram para o `ControladorConfiguracao`. `TelaPrincipal` tinha 25 métodos, 15 atributos e 337 linhas (texto + todo o painel). **Extrair Classe**: o painel virou `PainelConfiguracoes`, e a tela ficou com 13 métodos, 5 atributos e 163 linhas. O mesmo problema aparecia num módulo: `estilo.py` tinha 388 linhas e cinco assuntos (fonte do sistema, escala, estilos de texto, desenho e deslizador), e chegou a 497 com a `Caixa` e o `EstiloTexto`. **Mover Classe**: `Caixa`, `Desenho`, os ícones e o `Deslizador` foram para `desenho.py`, e o `estilo.py` ficou só com o tema (168 linhas). |
+| 3 | Método Longo | OK | Nenhum método com lógica passa de 20 linhas. O mais longo é `CatalogoInstrumentos.padrao()` (32 linhas), mas ele é só a lista dos 30 instrumentos, sem nenhum `if` ou laço. Pelo Radon, todos os 329 blocos têm complexidade ciclomática nota A (ver 10.2). |
 | 4 | Lista de Parâmetros Longa | **Refatorado** | Os métodos de desenho recebiam 7 ou 8 valores soltos, ex.: `botao(x, y, largura, altura, texto, comando, cor, raio)` e `texto(x, y, texto, tamanho, cor, ancora, tags)`. **Introduzir Objeto-Parâmetro**: posição e tamanho viraram uma `Caixa`, e tamanho, cor e âncora do texto viraram um `EstiloTexto`. Agora nenhum método passa de 5 parâmetros. O construtor do `ControladorAplicacao` também caiu de 7 para 5, como consequência do item 2. |
-| 5 | Inveja de Recursos | **Refatorado** | `RegraInstrumentoSomaDigito.aplicar` pegava o instrumento do `ParametrosMusica`, fazia a conta com o limite 127 e devolvia o resultado: estava mais interessada nos dados de outra classe do que nos seus. **Mover Método**: a conta virou `ParametrosMusica.somar_ao_instrumento(n)`, e a regra só chama esse método. As outras regras já faziam assim (`incrementar_oitava()`, `dobrar_volume()`), que é exatamente o exemplo do checklist. |
-| 6 | Obsessão por Tipos Primitivos | **Refatorado em parte** | O modelo já usa objetos pequenos: `NotaMusical` (letra + acidente, e sabe calcular seu valor MIDI), `Duracao` (Enum), `Instrumento`, `Token`, `EventoMusical`. Na interface, as posições eram quatro números soltos em toda chamada; agora são `Caixa`. Volume e oitava continuam `int` de propósito: os limites ficam num lugar só (`limites.py`) e são validados em um lugar só (`ParametrosMusica` e `ConfiguracaoInicial`). Uma classe `Volume` acrescentaria uma classe sem tirar nenhuma regra repetida. |
-| 7 | Switch Statements | OK | Não existe `switch` nem cadeia de `if/elif` por caractere: cada comando é uma subclasse de `RegraMapeamento` e o `Mapeamento` escolhe por polimorfismo (padrão Strategy), que é a correção sugerida no próprio checklist. Os poucos `if/elif` que existem são pequenos e locais (ex.: `TelaReproducao._mostrar_estado` escolhe entre "tocar", "pausar" e "retomar"). |
-| 8 | Cirurgia com Espingarda | Analisado, mantido | Um **comando novo** no texto é uma mudança local: uma classe de regra nova e uma linha em `Mapeamento.padrao()`. Já um **parâmetro novo por voz** (ex.: pan, esquerda/direita) mexeria em várias classes: `ParametrosMusica` (valor atual), `ConfiguracaoInicial` (valor inicial), `EventoMusical` (foto na nota), `Sintetizador` (mensagem MIDI), `ControladorConfiguracao` e `PainelConfiguracoes` (tela). É o ponto mais fraco que sobra. Mantivemos porque cada classe muda pela sua própria responsabilidade (modelo, valor inicial, MIDI, tela), que é o custo normal de separar em camadas; juntar tudo numa classe só traria de volta a Classe Grande. |
-| 9 | Comentários | OK | Não há código comentado, e os comentários de linha explicam o **porquê** (ex.: `# "end" traria um \n a mais`). Todos os métodos têm docstring no padrão do pydoc; alguns curtos repetem o nome (ex.: `get_bpm`: "Devolve o BPM inicial."), mantidos para a documentação gerada ficar completa. Na Fase 3 apagamos uma docstring duplicada em `CatalogoInstrumentos.padrao()`. |
+| 5 | Inveja de Recursos | **Refatorado** | `RegraInstrumentoSomaDigito.aplicar` pegava o instrumento do `ParametrosMusica`, fazia a conta com o limite 127 e devolvia o resultado. **Mover Método**: a conta virou `ParametrosMusica.somar_ao_instrumento(n)`. As outras regras já faziam assim (`incrementar_oitava()`, `dobrar_volume()`), que é exatamente o exemplo do checklist. `TelaPrincipal._ao_gerar` decidia "texto igual → só regera" usando só dados do controlador (`musica_foi_gerada()`, o texto da última geração). **Mover Método**: a decisão foi para `ControladorAplicacao.gerar_musica(texto)`. Bônus: essa regra é um requisito, e na tela ela não tinha teste; no controlador ganhou dois. |
+| 6 | Obsessão por Tipos Primitivos | **Refatorado** | Na interface, as posições eram quatro números soltos em toda chamada; agora são `Caixa`. O estado da reprodução eram dois booleanos (`em_reproducao` e `pausado`) para três estados, o que ainda permitia um quarto sem sentido (pausado sem estar tocando); agora é o Enum `EstadoReproducao` (`PARADA`, `TOCANDO`, `PAUSADA`). Os padrões por voz eram três listas paralelas (instrumentos, oitavas, volumes), e os valores de uma mesma voz ficavam espalhados nas três; agora cada voz é um `PadraoVoz`, e `PADROES_POR_VOZ` é escrito igual à tabela dos requisitos. O modelo já usava objetos pequenos desde a Fase 2: `NotaMusical` (que sabe calcular seu valor MIDI), `Duracao`, `Instrumento`, `Token`, `EventoMusical`. Volume e oitava continuam `int` de propósito: os limites ficam num lugar só (`limites.py`) e são validados num lugar só; uma classe `Volume` acrescentaria uma classe sem tirar nenhuma regra repetida. |
+| 7 | Switch Statements | **Refatorado** (casos pequenos) | O caso grande do checklist, um `switch` por caractere, nunca existiu: cada comando é uma subclasse de `RegraMapeamento`, e o `Mapeamento` escolhe por polimorfismo (padrão Strategy). Sobravam três condicionais pequenos que testavam um "tipo": `Desenho.icone` (tipo da parte do ícone: linha, círculo ou arco; era o único bloco nota B no Radon), `TelaReproducao._ao_tocar_ou_pausar` e `_mostrar_estado` (o que o botão de play faz e mostra em cada estado). **Substituir Condicional por Tabela**: cada um virou um dicionário que liga o tipo ou estado ao método ou ao texto certo. |
+| 8 | Cirurgia com Espingarda | Analisado, mantido | Um **comando novo** no texto é uma mudança local: uma classe de regra nova e uma linha em `Mapeamento.padrao()`. Já um **parâmetro novo por voz** (ex.: pan, esquerda/direita) ainda mexe em várias classes: `PadraoVoz` (valor inicial), `ParametrosMusica` (valor atual), `EventoMusical` (foto na nota), `Sintetizador` (mensagem MIDI), `ControladorConfiguracao` e `PainelConfiguracoes` (tela). É o ponto mais fraco que sobra. Mantivemos porque cada classe muda pela sua própria responsabilidade (modelo, MIDI, tela), que é o custo normal de separar em camadas; juntar tudo numa classe só traria de volta a Classe Grande. O `PadraoVoz` já ajudou: antes um parâmetro novo era uma quarta lista paralela, agora é um campo a mais. |
+| 9 | Comentários | OK | Não há código comentado, e os comentários de linha explicam o **porquê** (ex.: `# "end" traria um \n a mais`). Todos os métodos têm docstring no padrão do pydoc; alguns curtos repetem o nome (ex.: `get_bpm`: "Devolve o BPM inicial."), mantidos para a documentação gerada ficar completa. Apagamos uma docstring duplicada em `CatalogoInstrumentos.padrao()`. |
 | 10 | Classes Alternativas com Interfaces Diferentes | **Refatorado** | A mesma ação tinha dois nomes: `Player.play()` e `Player.stop()`, mas `BackendAudio.tocar()`/`parar()` e `ControladorAplicacao.tocar()`/`parar()`. **Renomear Método**: o Player passou a usar `tocar()` e `parar()`. A interface comum de áudio (`BackendAudio`, abstrata) já existia desde a Fase 2, e é o que permite trocar o pygame pelo `BackendFalso` nos testes. |
 
-Aproveitamos para tirar também o que não era usado em lugar nenhum (nem nos testes): `Voz.ultima_nota`, `Token.eh_caractere`, o atributo `Sintetizador.partitura`, o `import and_` em `nota_musical.py` e o `== True` em `contexto.py`.
+Aproveitamos para tirar também o código morto: `Voz.ultima_nota`, `Token.eh_caractere` e o atributo `Sintetizador.partitura` (não eram usados em lugar nenhum), imports sem uso (`and_` em `nota_musical.py`, e `pytest`, `pygame` e constantes de instrumentos em alguns testes) e o `== True` em `contexto.py`.
 
-### 10.2 Antes e depois, em números
+### 10.2 Radon
+
+O Radon mede duas coisas:
+
+- **Complexidade ciclomática (CC)**: quantos caminhos diferentes existem dentro de uma função (cada `if`, `for`, `while`, `and`, `or` e `except` soma um). Nota A vai de 1 a 5, B de 6 a 10, C de 11 a 20. Quanto mais caminhos, mais difícil de entender e de testar.
+- **Índice de manutenibilidade (MI)**: uma nota de 0 a 100 por arquivo, calculada a partir do tamanho, da complexidade e da quantidade de comentários. Nota A é acima de 20; quanto mais alto, mais fácil de manter. Arquivos maiores tendem a ter MI menor.
+
+| Medida | Antes (Fase 2) | Depois (Fase 3) |
+|--------|----------------|-----------------|
+| Blocos (funções, métodos, classes) com CC abaixo de nota A | 1 (`Desenho.icone`, CC 6) | 0 |
+| CC média | 1,59 (A) | 1,50 (A) |
+| Arquivos com MI abaixo de nota A | 0 | 0 |
+| Menores MI | `estilo.py` 48,7; `tela_principal.py` 51,9 | `desenho.py` 49,2; `painel_configuracoes.py` 59,2; `configuracao_inicial.py` 59,2 |
+| MI de `tela_principal.py` | 51,9 | 69,4 |
+| MI de `estilo.py` | 48,7 | 66,4 (o desenho foi para `desenho.py`) |
+
+Para rodar, na pasta do projeto (com o venv ativo):
+
+```bash
+pip install radon pylint
+radon cc -s -a gerador_musical main.py     # complexidade de cada bloco e a média
+radon cc -s -n B gerador_musical main.py   # só os blocos com nota B ou pior (hoje: nenhum)
+radon mi -s gerador_musical main.py        # índice de manutenibilidade de cada arquivo
+pylint gerador_musical main.py             # avisos e nota geral
+```
+
+### 10.3 Pylint e outros números
 
 | Medida | Antes | Depois |
 |--------|-------|--------|
-| Avisos de design do Pylint (muitos argumentos, muitos métodos públicos, muitos atributos, import sem uso, string sem efeito) | 20 | 3 |
-| Métodos públicos do `ControladorAplicacao` | 23 | 14 (+ 9 no `ControladorConfiguracao`) |
-| `TelaPrincipal`: métodos / atributos / linhas | 25 / 15 / 337 | 13 / 6 / 168 |
+| Avisos de design do Pylint (muitos argumentos, muitos atributos, muitos métodos públicos, atributo criado fora do `__init__`, import ou argumento sem uso, string sem efeito, `== True`, código duplicado) | 34 | 1 |
+| Nota geral do Pylint (inclui avisos de estilo) | 9,22 | 9,55 |
+| Métodos públicos do `ControladorAplicacao` | 23 | 15 (+ 9 no `ControladorConfiguracao`) |
+| `TelaPrincipal`: métodos / atributos / linhas | 25 / 15 / 337 | 13 / 5 / 163 |
+| Atributos da `TelaReproducao` | 8 | 6 |
 | Maior número de parâmetros num método de desenho | 8 | 5 |
-| Complexidade ciclomática média (Radon) | 1,59 (A) | 1,56 (A) |
-| Testes automáticos, todos passando | 73 | 86 |
+| Testes automáticos, todos passando | 73 | 90 |
 
-Os 3 avisos que sobraram, e por que ficaram:
+O aviso de design que sobrou, e por que ficou: `PainelConfiguracoes` tem 12 atributos (o Pylint sugere no máximo 7). São os controles que ele precisa atualizar quando a voz muda (os textos de bpm, oitava, volume e instrumento, o deslizador, o menu e as abas) e a lista de instrumentos. Todos estão declarados no `__init__`, com comentários. Para chegar a 7 seria preciso criar uma classe para cada controle só para guardar um id do Canvas, o que espalharia um painel simples em cinco classes.
 
-- `PainelConfiguracoes` tem 12 atributos (o Pylint sugere no máximo 7). São os controles que ele precisa atualizar quando a voz muda: rótulos, deslizador, menu e abas. Dividir mais só espalharia o mesmo painel em várias classes.
-- `TelaReproducao` tem 8 atributos, pelo mesmo motivo (rótulos do estado e do botão de play, estados `_tocando` e `_pausado`).
-- `TelaPrincipal._ao_modificar_texto(evento)` não usa o `evento`, mas o tkinter sempre passa esse argumento para quem trata o evento.
+O que ainda aparece na nota geral do Pylint são avisos de **estilo**, não smells: `else` depois de `return` (ex.: `if ...: return x` / `else: return y`), nomes de variáveis privadas do módulo (`_escala`, `_familia`), `import ctypes` dentro das funções que só rodam no Windows ou no Linux (de propósito, para não importar o que o sistema não usa) e um falso positivo em `pygame.error` (o Pylint não enxerga dentro do pygame, que é escrito em C).
 
-Para rodar as mesmas medições: `radon cc -a gerador_musical` e `pylint gerador_musical` (os dois se instalam com `pip install radon pylint`).
-
-### 10.3 Refatorações usadas, pelo nome do catálogo
+### 10.4 Refatorações usadas, pelo nome do catálogo
 
 | Refatoração | Onde |
 |-------------|------|
 | Extrair Classe (*Extract Class*) | `ControladorConfiguracao` (de `ControladorAplicacao`), `PainelConfiguracoes` (de `TelaPrincipal`) |
-| Extrair Método (*Extract Method*) | `PainelConfiguracoes._alterar`, `Caixa.em_pixels`, `estilo._contorno_arredondado` |
+| Mover Classe (*Move Class*) | `Caixa`, `Desenho`, `ICONES` e `Deslizador`: de `estilo.py` para `desenho.py` |
+| Extrair Método (*Extract Method*) | `PainelConfiguracoes._alterar`, `Caixa.em_pixels`, `Caixa.quadrado_da_grade`, `desenho._contorno_arredondado`, `ConfiguracaoInicial._padrao` e `_alterar_padrao` |
 | Introduzir Objeto-Parâmetro (*Introduce Parameter Object*) | `Caixa` e `EstiloTexto` nos métodos de `Desenho` e no `Deslizador` |
-| Mover Método (*Move Method*) | `ParametrosMusica.somar_ao_instrumento` (saiu de `RegraInstrumentoSomaDigito`) |
+| Mover Método (*Move Method*) | `ParametrosMusica.somar_ao_instrumento` (saiu de `RegraInstrumentoSomaDigito`); a decisão de regerar foi de `TelaPrincipal._ao_gerar` para `ControladorAplicacao.gerar_musica(texto)` |
+| Substituir Primitivo por Objeto (*Replace Primitive with Object*) | `EstadoReproducao` (no lugar de dois booleanos), `PadraoVoz` (no lugar de três listas paralelas) |
+| Substituir Condicional por Tabela | `Desenho.icone`, `TelaReproducao._ao_tocar_ou_pausar` e `BOTAO_PLAY` |
 | Renomear Método (*Rename Method*) | `Player.play()`/`stop()` → `tocar()`/`parar()` |
-| Remover código morto | `Voz.ultima_nota`, `Token.eh_caractere`, `Sintetizador.partitura`, import sem uso |
+| Remover código morto | `Voz.ultima_nota`, `Token.eh_caractere`, `Sintetizador.partitura`, imports sem uso |
 
 Quando chegar o relatório do grupo revisor, esta seção ajuda a montar o slide pedido no enunciado: para cada observação deles, dá para apontar se já estava resolvida aqui ou o que foi feito depois.

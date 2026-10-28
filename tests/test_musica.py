@@ -8,7 +8,7 @@ import pytest
 from gerador_musical.musica.duracao import Duracao
 from gerador_musical.musica.nota_musical import NotaMusical, Acidente
 from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
-from gerador_musical.musica.instrumentos import CRAVO, FAGOTE, ORGAO_DE_IGREJA, PIANO, CatalogoInstrumentos
+from gerador_musical.musica.instrumentos import CatalogoInstrumentos
 from gerador_musical.musica.parametros_musica import ParametrosMusica
 from gerador_musical.musica.evento_musical import EventoMusical
 from gerador_musical.musica.partitura import Partitura
@@ -121,6 +121,15 @@ def test_alteracao_do_usuario_aparece_em_criar_parametros():
     c = ConfiguracaoInicial.padrao()
     c.set_instrumento_inicial(1, 40)
     assert c.criar_parametros(1).get_instrumento() == 40
+
+
+def test_alterar_uma_voz_nao_mexe_nas_outras_e_restaurar_volta_ao_padrao():
+    c = ConfiguracaoInicial.padrao()
+    c.set_oitava_inicial(1, 2)
+    assert [c.get_oitava_inicial(i) for i in range(4)] == [6, 2, 4, 3]
+    assert c.get_volume_inicial(1) == 80          # os outros valores da voz 1 continuam
+    c.restaurar_padroes()
+    assert c.get_oitava_inicial(1) == 5
 
 
 # ---- Partitura ----------------------------------------------------------

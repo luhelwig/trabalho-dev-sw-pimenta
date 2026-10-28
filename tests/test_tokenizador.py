@@ -1,6 +1,5 @@
 """Testes do Tokenizador: como cada linha é quebrada em tokens."""
 
-import pytest
 from gerador_musical.interpretacao.tokenizador import Tokenizador
 from gerador_musical.interpretacao.tokens import TipoToken
 from gerador_musical.musica.duracao import Duracao

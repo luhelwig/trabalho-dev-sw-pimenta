@@ -8,7 +8,7 @@ Usam o backend falso do tests/conftest.py, então rodam sem som.
 import mido
 import pytest
 
-from gerador_musical.aplicacao.controlador import ControladorAplicacao
+from gerador_musical.aplicacao.controlador import ControladorAplicacao, EstadoReproducao
 from gerador_musical.aplicacao.controlador_configuracao import ControladorConfiguracao
 from gerador_musical.entrada.entrada_usuario import EntradaUsuario
 from gerador_musical.excecoes import FormatoInvalidoErro, MusicaNaoGeradaErro, TextoVazioErro
@@ -29,9 +29,14 @@ def configuracao():
 
 
 @pytest.fixture
-def controlador(configuracao, backend, tmp_path):
+def parser(configuracao):
+    """Parser real, com a mesma configuração dos controladores."""
+    return Parser(Tokenizador(), Mapeamento.padrao(), configuracao)
+
+
+@pytest.fixture
+def controlador(parser, backend, tmp_path):
     """ControladorAplicacao montado como no main, mas com backend falso e pasta temporária."""
-    parser = Parser(Tokenizador(), Mapeamento.padrao(), configuracao)
     return ControladorAplicacao(
         entrada=EntradaUsuario(), parser=parser, sintetizador=Sintetizador(),
         player=Player(backend), exportador=ExportadorMidi(tmp_path),
@@ -77,15 +82,13 @@ def test_configuracao_fora_do_limite_gera_value_error(controlador_configuracao, 
 
 
 def test_texto_vazio_gera_erro(controlador):
-    controlador.atualizar_texto("   ")
     with pytest.raises(TextoVazioErro):
-        controlador.gerar_musica()
+        controlador.gerar_musica("   ")
 
 
 def test_caracteres_de_outro_alfabeto_geram_formato_incorreto(controlador):
-    controlador.atualizar_texto("Привет")
     with pytest.raises(FormatoInvalidoErro):
-        controlador.gerar_musica()
+        controlador.gerar_musica("Привет")
 
 
 def test_exportar_sem_gerar_gera_erro(controlador):
@@ -94,8 +97,7 @@ def test_exportar_sem_gerar_gera_erro(controlador):
 
 
 def test_gerar_tocar_e_exportar(controlador, backend, tmp_path):
-    controlador.atualizar_texto("C:1D:1E:1")
-    controlador.gerar_musica()
+    controlador.gerar_musica("C:1D:1E:1")
     controlador.tocar()
     caminho = controlador.exportar_midi()
     assert controlador.musica_foi_gerada()
@@ -103,19 +105,38 @@ def test_gerar_tocar_e_exportar(controlador, backend, tmp_path):
     assert caminho.parent == tmp_path and caminho.exists()
 
 
-def test_regerar_usa_a_configuracao_nova(controlador, controlador_configuracao):
-    """O que o painel muda vale ao regerar, sem reinterpretar o texto."""
-    controlador.atualizar_texto("C:1D:1")
-    controlador.gerar_musica()
+def test_mesmo_texto_regera_sem_reinterpretar(controlador, controlador_configuracao, parser, monkeypatch):
+    """Requisito: mudar parâmetros e gerar de novo sem processar o texto outra vez."""
+    textos_interpretados = []
+    interpretar = parser.interpretar
+    monkeypatch.setattr(parser, "interpretar", lambda texto: textos_interpretados.append(texto) or interpretar(texto))
+    controlador.gerar_musica("C:1D:1")
     controlador_configuracao.set_bpm(200)
-    controlador.regerar_com_novos_parametros()
+    controlador.gerar_musica("C:1D:1")          # mesmo texto, BPM novo
+    assert textos_interpretados == ["C:1D:1"]   # interpretou uma vez só
     midi = mido.MidiFile(controlador.exportar_midi())
     assert midi.tracks[0][0].tempo == mido.bpm2tempo(200)
 
 
+def test_texto_diferente_e_interpretado_de_novo(controlador, parser, monkeypatch):
+    textos_interpretados = []
+    interpretar = parser.interpretar
+    monkeypatch.setattr(parser, "interpretar", lambda texto: textos_interpretados.append(texto) or interpretar(texto))
+    controlador.gerar_musica("C:1")
+    controlador.gerar_musica("D:1")
+    assert textos_interpretados == ["C:1", "D:1"]
+
+
 def test_limpar_para_a_musica_e_esquece_o_texto(controlador, backend):
-    controlador.atualizar_texto("C:1")
-    controlador.gerar_musica()
+    controlador.gerar_musica("C:1")
     controlador.limpar()
     assert not controlador.musica_foi_gerada()
     assert backend.chamadas[-1] == "parar"
+
+
+def test_estado_da_reproducao_vem_do_player(controlador):
+    controlador.gerar_musica("C:1")
+    assert controlador.estado_reproducao() is EstadoReproducao.PARADA
+    controlador.tocar()
+    controlador.pausar()
+    assert controlador.estado_reproducao() is EstadoReproducao.PAUSADA

@@ -2,15 +2,32 @@
 
 Fase 3: play()/stop() viraram tocar()/parar(), os mesmos nomes do
 BackendAudio e do ControladorAplicacao (antes eram dois vocabulários para
-a mesma ação).
+a mesma ação). O estado da reprodução, que eram dois booleanos
+(em_reproducao e pausado), virou o Enum EstadoReproducao.
 """
 
+from enum import Enum
 from pathlib import Path
 import tempfile
 import mido
 from gerador_musical.excecoes import MusicaNaoGeradaErro
 
 from gerador_musical.saida.backend_audio import BackendAudio
+
+
+class EstadoReproducao(Enum):
+    """NOVO (Fase 3): em que ponto a reprodução está.
+
+    Antes eram dois booleanos, em_reproducao e pausado: juntos eles
+    representavam três estados e ainda permitiam um quarto, inválido
+    (pausado sem estar tocando). E a TelaReproducao guardava uma cópia
+    deles. Agora o estado existe num lugar só, aqui no Player, e a tela
+    pergunta ao controlador (bad smell "Obsessão por Tipos Primitivos").
+    """
+
+    PARADA = "parada"
+    TOCANDO = "tocando"
+    PAUSADA = "pausada"
 
 
 class Player:
@@ -21,8 +38,7 @@ class Player:
     respondendo (requisito não-funcional).
 
     Attributes:
-        em_reproducao: True depois de tocar() e até parar().
-        pausado: True enquanto estiver pausado.
+        estado: PARADA, TOCANDO ou PAUSADA.
         musica: último MIDI carregado (None se nada foi gerado).
     """
 
@@ -32,8 +48,7 @@ class Player:
         Args:
             backend: o "aparelho de som" (BackendPygame ou um falso nos testes).
         """
-        self.em_reproducao: bool = False
-        self.pausado: bool = False
+        self.estado: EstadoReproducao = EstadoReproducao.PARADA
         self.musica: mido.MidiFile | None = None
         self._backend: BackendAudio = backend
         self._arquivo_temporario: Path | None = None
@@ -64,26 +79,24 @@ class Player:
             raise MusicaNaoGeradaErro("Gere a música antes de tocar.")
         self._backend.carregar(self._arquivo_temporario)
         self._backend.tocar()
-        self.em_reproducao = True
-        self.pausado = False
+        self.estado = EstadoReproducao.TOCANDO
 
     def parar(self) -> None:
-        """Para a reprodução e zera os estados."""
+        """Para a reprodução e volta ao estado PARADA."""
         self._backend.parar()
-        self.em_reproducao = False
-        self.pausado = False
+        self.estado = EstadoReproducao.PARADA
 
     def pausar(self) -> None:
-        """Pausa, se estiver tocando e ainda não estiver pausado."""
-        if self.em_reproducao and not self.pausado:
+        """Pausa, só se estiver TOCANDO."""
+        if self.estado is EstadoReproducao.TOCANDO:
             self._backend.pausar()
-            self.pausado = True
+            self.estado = EstadoReproducao.PAUSADA
 
     def retomar(self) -> None:
-        """Retoma, se estiver tocando e estiver pausado."""
-        if self.em_reproducao and self.pausado:
+        """Retoma, só se estiver PAUSADA."""
+        if self.estado is EstadoReproducao.PAUSADA:
             self._backend.retomar()
-            self.pausado = False
+            self.estado = EstadoReproducao.TOCANDO
 
     def terminou(self) -> bool:
         """NOVO — diz se a música acabou sozinha.
@@ -93,6 +106,6 @@ class Player:
         pygame também responde "não estou tocando" durante a pausa.
 
         Returns:
-            True se estava tocando, não está pausado e o backend parou.
+            True se o estado é TOCANDO e o backend parou.
         """
-        return self.em_reproducao and not self.pausado and not self._backend.esta_tocando()
+        return self.estado is EstadoReproducao.TOCANDO and not self._backend.esta_tocando()

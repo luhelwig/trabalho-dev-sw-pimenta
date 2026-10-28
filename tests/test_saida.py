@@ -6,7 +6,6 @@ backend falso que só anota o que foi chamado, então rodam sem som.
 
 import mido
 import pytest
-import pygame
 
 from gerador_musical.excecoes import MusicaNaoGeradaErro
 from gerador_musical.interpretacao.parser import Parser
@@ -14,7 +13,7 @@ from gerador_musical.interpretacao.regras.mapeamento import Mapeamento
 from gerador_musical.interpretacao.tokenizador import Tokenizador
 from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
 from gerador_musical.saida.exportador import ExportadorMidi
-from gerador_musical.saida.player import Player
+from gerador_musical.saida.player import EstadoReproducao, Player
 from gerador_musical.saida.sintetizador import Sintetizador
 
 
@@ -103,6 +102,22 @@ def test_tocar_pausar_retomar_parar_chamam_backend(backend):
     player.retomar()
     player.parar()
     assert backend.chamadas == ["parar", "carregar", "tocar", "pausar", "retomar", "parar"]
+
+
+def test_estado_da_reproducao(backend):
+    player = Player(backend)
+    player.carregar(gerar("C:3"))
+    assert player.estado is EstadoReproducao.PARADA
+    player.pausar()                          # parada: pausar não faz nada
+    assert player.estado is EstadoReproducao.PARADA
+    player.tocar()
+    assert player.estado is EstadoReproducao.TOCANDO
+    player.pausar()
+    assert player.estado is EstadoReproducao.PAUSADA
+    player.retomar()
+    assert player.estado is EstadoReproducao.TOCANDO
+    player.parar()
+    assert player.estado is EstadoReproducao.PARADA
 
 
 def test_tocar_de_novo_nao_recria_a_musica(backend):

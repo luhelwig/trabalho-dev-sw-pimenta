@@ -1,6 +1,5 @@
 """Testes de integração do Parser (Tokenizador + Mapeamento reais)."""
 
-import pytest
 from gerador_musical.interpretacao.parser import Parser
 from gerador_musical.interpretacao.regras.mapeamento import Mapeamento
 from gerador_musical.interpretacao.tokenizador import Tokenizador

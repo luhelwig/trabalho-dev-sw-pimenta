@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from gerador_musical.excecoes import GeradorMusicalErro
 from gerador_musical.interface import estilo
-from gerador_musical.interface.estilo import Caixa
+from gerador_musical.interface.desenho import Caixa, Desenho
 from gerador_musical.interface.painel_configuracoes import PainelConfiguracoes
 
 if TYPE_CHECKING:
@@ -27,10 +27,12 @@ class TelaPrincipal(tk.Frame):
     "salvar texto" ao lado de "texto de entrada:" (Mudança 1).
 
     Fase 3: o painel de configurações virou a classe PainelConfiguracoes
-    (bad smell "Classe Grande"); esta tela cuida do texto e dos botões.
+    (bad smell "Classe Grande"); esta tela cuida do texto e dos botões. A
+    decisão de regerar sem reinterpretar foi para o controlador.
 
     Attributes:
         campo_texto: campo onde o usuário digita.
+        dica: o "digite aqui..." que aparece com o campo vazio.
         painel: painel de configurações (voz, volume, bpm, instrumento, oitava).
     """
 
@@ -44,14 +46,14 @@ class TelaPrincipal(tk.Frame):
         """
         super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
-        self.desenho: estilo.Desenho | None = None
+        self.desenho: Desenho | None = None
         self.campo_texto: tk.Text | None = None
+        self.dica: tk.Label | None = None
         self.painel: PainelConfiguracoes | None = None
-        self._texto_gerado: str | None = None   # texto da última geração
 
     def construir(self) -> None:
         """Desenha a tela inteira: cabeçalho, campo de texto, painel e botões."""
-        self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
+        self.desenho = Desenho(self, self.LARGURA, self.ALTURA)
         self.desenho.pack()
         self._construir_cabecalho()
         self._construir_campo_texto()
@@ -111,28 +113,21 @@ class TelaPrincipal(tk.Frame):
     def _ao_gerar(self) -> None:
         """Clique em "gerar música": gera e, se der certo, vai para a reprodução.
 
-        Se o texto é o mesmo da última geração, só os parâmetros mudaram: regera
-        sem reinterpretar o texto (requisito). Em GeradorMusicalErro, mostra a
-        mensagem e continua nesta tela.
+        Se o texto não mudou, o controlador só aplica os parâmetros novos, sem
+        reinterpretar o texto. Em GeradorMusicalErro, mostra a mensagem e
+        continua nesta tela.
         """
-        texto = self.get_texto()
         try:
-            if texto == self._texto_gerado and self.app.controlador.musica_foi_gerada():
-                self.app.controlador.regerar_com_novos_parametros()
-            else:
-                self.app.controlador.atualizar_texto(texto)
-                self.app.controlador.gerar_musica()
+            self.app.controlador.gerar_musica(self.get_texto())
         except GeradorMusicalErro as erro:
             self.app.mostrar_erro(str(erro))
             return
-        self._texto_gerado = texto
         self.app.mostrar_tela("reproducao")
 
     def _ao_limpar(self) -> None:
         """Clique em "limpar": esvazia o campo e o texto guardado no controlador."""
         self.app.controlador.limpar()
         self.set_texto("")
-        self._texto_gerado = None
 
     def _ao_salvar_texto(self) -> None:
         """Clique em "salvar texto".
@@ -154,11 +149,11 @@ class TelaPrincipal(tk.Frame):
             return
         self.app.mostrar_info(f"Texto salvo em {caminho}")
 
-    def _ao_modificar_texto(self, evento: tk.Event) -> None:
+    def _ao_modificar_texto(self, _evento: tk.Event) -> None:
         """Evento <<Modified>> do campo: rearma o evento e atualiza a dica.
 
         Args:
-            evento: evento do tkinter (não usado).
+            _evento: evento do tkinter (o "_" no nome indica que não é usado).
         """
         self.campo_texto.edit_modified(False)   # rearma o evento <<Modified>>
         self._atualizar_dica()

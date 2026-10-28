@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 
 from gerador_musical.excecoes import GeradorMusicalErro
 from gerador_musical.interface import estilo
-from gerador_musical.interface.estilo import Caixa
+from gerador_musical.interface.desenho import Caixa, Desenho
 
 if TYPE_CHECKING:
     from gerador_musical.interface.app import App
@@ -32,11 +32,11 @@ class TelaCarregamento(tk.Frame):
         """
         super().__init__(app, bg=estilo.FUNDO)
         self.app: App = app
-        self.desenho: estilo.Desenho | None = None
+        self.desenho: Desenho | None = None
 
     def construir(self) -> None:
         """Desenha o cartão, a área "buscar arquivo..." e o botão "voltar"."""
-        d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
+        d = self.desenho = Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
         d.retangulo(Caixa(25, 19, 764, 486), estilo.CARTAO, raio=57)
         d.texto(407, 19, "gerador de música", estilo.ESTILO_TITULO)

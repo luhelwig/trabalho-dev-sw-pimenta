@@ -5,8 +5,6 @@ uma voz com instrumento 6 (Cravo), oitava 6 e volume 40, numa partitura
 vazia com BPM 120.
 """
 
-import pytest
-
 from gerador_musical.interpretacao.regras.mapeamento import Mapeamento
 from gerador_musical.interpretacao.regras.regra_mapeamento import RegraPorCaractere
 from gerador_musical.interpretacao.regras.regras_eventos import RegraNota, RegraPausa, RegraRepetirOuPausar
