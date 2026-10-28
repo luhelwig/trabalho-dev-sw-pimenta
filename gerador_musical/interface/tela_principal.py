@@ -32,6 +32,7 @@ class TelaPrincipal(tk.Frame):
     """
 
     NUMERO_DE_VOZES = 4
+    VOLUME_MAXIMO = 100  
     PASSO_BPM = 10
     ITENS_POR_COLUNA = 10         # lista de instrumentos em colunas, para não sair da tela
     LARGURA, ALTURA = 813, 1232   # frame do Figma (1157) + 75 px da linha "voz:"
@@ -123,7 +124,7 @@ class TelaPrincipal(tk.Frame):
             self._abas_voz.append(fundo)
 
     def _construir_volume(self, x: float, y: float) -> None:
-        """Rótulo, valor numérico, ícone de alto-falante e deslizador de 0 a 127.
+        """Rótulo, valor numérico, ícone de alto-falante e deslizador de 0 a 100.
 
         Args:
             x: esquerda do rótulo, em px do Figma.
@@ -133,7 +134,7 @@ class TelaPrincipal(tk.Frame):
         d.texto(x, y, "volume:", cor=estilo.FUNDO)
         self.rotulo_volume = d.texto(723, y, "", cor=estilo.FUNDO, ancora="ne")
         d.icone("alto_falante", x + 6.5, y + 60, 32, 62, estilo.FUNDO, espessura=3)
-        self.deslizador_volume = estilo.Deslizador(d, 122, y + 89, 601, 0, 127, self._ao_mudar_volume)
+        self.deslizador_volume = estilo.Deslizador(d, 122, y + 89, 601, 0, self.VOLUME_MAXIMO, self._ao_mudar_volume)
 
     def _construir_contador(self, x: float, y: float, titulo: str, ao_mudar, passo: int) -> int:
         """Rótulo + pílula "valor  - +" (usado no bpm e na oitava).
@@ -300,7 +301,7 @@ class TelaPrincipal(tk.Frame):
         """Chamado pelo deslizador: salva o volume da voz e atualiza o número.
 
         Args:
-            valor: novo volume (0–127).
+            valor: novo volume (0–100).
         """
         self.app.controlador.set_volume_voz(self.voz_selecionada, valor)
         self.desenho.itemconfig(self.rotulo_volume, text=str(valor))
