@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from gerador_musical.excecoes import GeradorMusicalErro
 from gerador_musical.interface import estilo
+from gerador_musical.interface.estilo import Caixa, EstiloTexto
 
 if TYPE_CHECKING:
     from gerador_musical.interface.app import App
@@ -51,23 +52,23 @@ class TelaReproducao(tk.Frame):
         """Desenha a tela: estado, "baixar midi", "salvar como...", play, "parar" e "voltar"."""
         d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
-        d.retangulo(24, 21, 764, 545, 57, estilo.CARTAO)
-        d.texto(406, 21, "gerador de música", estilo.TITULO, ancora="n")
+        d.retangulo(Caixa(24, 21, 764, 545), estilo.CARTAO, raio=57)
+        d.texto(406, 21, "gerador de música", estilo.ESTILO_TITULO)
         d.texto(55, 153, "música gerada!")
-        self.rotulo_estado = d.texto(757, 160, "", 50, cor=estilo.FUNDO, ancora="ne")
-        d.retangulo(49, 234, 715, 298, 25, estilo.PAINEL)
+        self.rotulo_estado = d.texto(757, 160, "", EstiloTexto(50, estilo.FUNDO, "ne"))
+        d.retangulo(Caixa(49, 234, 715, 298), estilo.PAINEL, raio=25)
 
-        d.botao(66, 261, 265, 76, "baixar midi", self._ao_baixar_midi)
-        d.botao(74, 361, 324, 47, "salvar como...", self._ao_salvar_midi_como, cor=estilo.FUNDO, raio=23)
+        d.botao(Caixa(66, 261, 265, 76), "baixar midi", self._ao_baixar_midi)
+        d.botao(Caixa(74, 361, 324, 47), "salvar como...", self._ao_salvar_midi_como, cor=estilo.FUNDO, raio=23)
 
         # círculo e pílula fazem a mesma coisa: tocar / pausar / retomar
         self._tag_play = d.nova_tag()
-        d.circulo(74, 435, 70, estilo.ESCURO, tags=self._tag_play)
+        d.circulo(Caixa(74, 435, 70, 70), estilo.ESCURO, tags=self._tag_play)
         d.tornar_clicavel(self._tag_play, self._ao_tocar_ou_pausar)
-        _, self.rotulo_play = d.botao(163, 439, 180, 58, "", self._ao_tocar_ou_pausar, cor=estilo.FUNDO, raio=29)
-        d.botao(357, 439, 130, 58, "parar", self._ao_parar, cor=estilo.FUNDO, raio=29)
+        _, self.rotulo_play = d.botao(Caixa(163, 439, 180, 58), "", self._ao_tocar_ou_pausar, cor=estilo.FUNDO, raio=29)
+        d.botao(Caixa(357, 439, 130, 58), "parar", self._ao_parar, cor=estilo.FUNDO, raio=29)
 
-        d.botao(581, 433, 158, 76, "voltar", self._ao_voltar)
+        d.botao(Caixa(581, 433, 158, 76), "voltar", self._ao_voltar)
         self._mostrar_estado("pronta para tocar")
 
     # ---- Eventos --------------------------------------------------------
@@ -185,5 +186,5 @@ class TelaReproducao(tk.Frame):
             acao = "tocar"
         d.itemconfig(self.rotulo_play, text=acao)
         d.delete(self.TAG_ICONE_PLAY)
-        d.icone("pausar" if tocando_agora else "tocar", 81, 442, 55, 55, estilo.PAINEL,
+        d.icone("pausar" if tocando_agora else "tocar", Caixa(81, 442, 55, 55), estilo.PAINEL,
                 tags=(self._tag_play, self.TAG_ICONE_PLAY))

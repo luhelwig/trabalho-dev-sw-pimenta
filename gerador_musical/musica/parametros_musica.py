@@ -103,6 +103,18 @@ class ParametrosMusica:
         """Devolve o programa MIDI do instrumento atual."""
         return self.instrumento_atual
 
+    def somar_ao_instrumento(self, quantidade: int) -> None:
+        """NOVO (Fase 3) — soma ao instrumento atual; passando de 127, recomeça do 0.
+
+        Antes essa conta ficava na RegraInstrumentoSomaDigito, que pegava o
+        instrumento daqui, fazia a conta e devolvia (bad smell "Inveja de
+        Recursos"). Quem conhece o limite 0–127 é esta classe.
+
+        Args:
+            quantidade: valor a somar (os dígitos pares do texto).
+        """
+        self.instrumento_atual = (self.instrumento_atual + quantidade) % (PROGRAMA_MIDI_MAXIMO + 1)
+
     def reset_instrumento(self) -> None:
         """NOVO — volta ao instrumento inicial da voz."""
         self.instrumento_atual = self.instrumento_inicial

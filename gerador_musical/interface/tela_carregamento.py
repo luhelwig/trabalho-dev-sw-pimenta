@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 
 from gerador_musical.excecoes import GeradorMusicalErro
 from gerador_musical.interface import estilo
+from gerador_musical.interface.estilo import Caixa
 
 if TYPE_CHECKING:
     from gerador_musical.interface.app import App
@@ -37,18 +38,18 @@ class TelaCarregamento(tk.Frame):
         """Desenha o cartão, a área "buscar arquivo..." e o botão "voltar"."""
         d = self.desenho = estilo.Desenho(self, self.LARGURA, self.ALTURA)
         d.pack()
-        d.retangulo(25, 19, 764, 486, 57, estilo.CARTAO)
-        d.texto(407, 19, "gerador de música", estilo.TITULO, ancora="n")
+        d.retangulo(Caixa(25, 19, 764, 486), estilo.CARTAO, raio=57)
+        d.texto(407, 19, "gerador de música", estilo.ESTILO_TITULO)
         d.texto(50, 167, "upload:")
-        d.retangulo(50, 232, 715, 249, 25, estilo.PAINEL)
+        d.retangulo(Caixa(50, 232, 715, 249), estilo.PAINEL, raio=25)
 
         tag = d.nova_tag()                       # nuvem + texto: um clique só
-        d.retangulo(70, 262, 500, 120, 0, estilo.PAINEL, tags=tag)
-        d.icone("nuvem", 88, 275, 96, 93, estilo.FUNDO, tags=tag)
-        d.texto(208, 287, "buscar arquivo...", cor=estilo.FUNDO, tags=tag)
+        d.retangulo(Caixa(70, 262, 500, 120), estilo.PAINEL, tags=tag)
+        d.icone("nuvem", Caixa(88, 275, 96, 93), estilo.FUNDO, tags=tag)
+        d.texto(208, 287, "buscar arquivo...", estilo.ESTILO_SECUNDARIO, tags=tag)
         d.tornar_clicavel(tag, self._ao_procurar_arquivo)
 
-        d.botao(599, 393, 153, 76, "voltar", self._ao_voltar)
+        d.botao(Caixa(599, 393, 153, 76), "voltar", self._ao_voltar)
 
     def _ao_procurar_arquivo(self) -> None:
         """Clique em "buscar arquivo...": abre o diálogo e carrega o .txt escolhido."""

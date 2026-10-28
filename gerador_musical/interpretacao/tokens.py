@@ -47,11 +47,3 @@ class Token:
     def eh_nota(self) -> bool:
         """Diz se o token é uma nota."""
         return self.tipo is TipoToken.NOTA
-
-    def eh_caractere(self, caractere: str) -> bool:
-        """Diz se o token é um CARACTERE igual ao informado.
-
-        Args:
-            caractere: caractere a comparar com o lexema.
-        """
-        return self.tipo is TipoToken.CARACTERE and self.lexema == caractere

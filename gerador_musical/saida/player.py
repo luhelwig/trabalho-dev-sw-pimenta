@@ -1,4 +1,9 @@
-"""Classe Player (Fase 1, adaptada na Fase 2)."""
+"""Classe Player (Fase 1, adaptada na Fase 2).
+
+Fase 3: play()/stop() viraram tocar()/parar(), os mesmos nomes do
+BackendAudio e do ControladorAplicacao (antes eram dois vocabulários para
+a mesma ação).
+"""
 
 from pathlib import Path
 import tempfile
@@ -16,7 +21,7 @@ class Player:
     respondendo (requisito não-funcional).
 
     Attributes:
-        em_reproducao: True depois de play() e até stop().
+        em_reproducao: True depois de tocar() e até parar().
         pausado: True enquanto estiver pausado.
         musica: último MIDI carregado (None se nada foi gerado).
     """
@@ -43,12 +48,12 @@ class Player:
         Args:
             musica: MIDI gerado pelo Sintetizador.
         """
-        self.stop()  # solta o arquivo anterior, se houver
+        self.parar()  # solta o arquivo anterior, se houver
         self.musica = musica
         self._arquivo_temporario = Path(tempfile.gettempdir()) / "gerador_musical.mid"
         musica.save(str(self._arquivo_temporario))
 
-    def play(self) -> None:
+    def tocar(self) -> None:
         """Toca a música do início.
 
         Raises:
@@ -62,7 +67,7 @@ class Player:
         self.em_reproducao = True
         self.pausado = False
 
-    def stop(self) -> None:
+    def parar(self) -> None:
         """Para a reprodução e zera os estados."""
         self._backend.parar()
         self.em_reproducao = False
@@ -73,7 +78,6 @@ class Player:
         if self.em_reproducao and not self.pausado:
             self._backend.pausar()
             self.pausado = True
-
 
     def retomar(self) -> None:
         """Retoma, se estiver tocando e estiver pausado."""

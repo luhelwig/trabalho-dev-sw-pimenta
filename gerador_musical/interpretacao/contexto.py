@@ -45,7 +45,7 @@ class ContextoInterpretacao:
             evento: nota ou pausa criada por uma regra.
         """
         self.voz.adicionar_evento(evento)
-        if evento.eh_nota() == True:
+        if evento.eh_nota():
             self.nota_anterior = evento
 
     def anterior_foi_nota(self) -> bool:

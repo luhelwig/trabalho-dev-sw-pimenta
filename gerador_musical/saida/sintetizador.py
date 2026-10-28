@@ -24,14 +24,9 @@ class Sintetizador:
 
     Attributes:
         TICKS_POR_BEAT: resolução do arquivo MIDI (480 ticks por beat).
-        partitura: última partitura convertida.
     """
 
     TICKS_POR_BEAT = 480
-
-    def __init__(self) -> None:
-        """Cria o sintetizador, ainda sem partitura."""
-        self.partitura: Partitura | None = None
 
     def gerar_musica(self, partitura: Partitura) -> mido.MidiFile:
         """Converte a partitura em MIDI tipo 1.
@@ -42,7 +37,6 @@ class Sintetizador:
         Returns:
             MidiFile com a trilha de andamento e uma trilha por voz.
         """
-        self.partitura = partitura
         midi = mido.MidiFile(type=1, ticks_per_beat=self.TICKS_POR_BEAT)
         midi.tracks.append(self._criar_trilha_andamento(partitura))
         for voz in partitura.get_vozes():

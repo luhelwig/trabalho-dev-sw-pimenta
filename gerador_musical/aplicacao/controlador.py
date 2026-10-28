@@ -1,11 +1,13 @@
-"""NOVA (Fase 2): fachada usada pela interface."""
+"""NOVA (Fase 2): fachada usada pela interface para texto, geração, reprodução e exportação.
+
+Fase 3 (bad smell "Classe Grande"): os métodos de configuração (BPM e
+parâmetros por voz) foram extraídos para ControladorConfiguracao.
+"""
 
 from pathlib import Path
 
 from gerador_musical.entrada.entrada_usuario import EntradaUsuario
 from gerador_musical.interpretacao.parser import Parser
-from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
-from gerador_musical.musica.instrumentos import CatalogoInstrumentos, Instrumento
 from gerador_musical.musica.partitura import Partitura
 from gerador_musical.saida.exportador import Exportador
 from gerador_musical.saida.player import Player
@@ -14,45 +16,41 @@ from gerador_musical.excecoes import FormatoInvalidoErro, MusicaNaoGeradaErro, T
 
 
 class ControladorAplicacao:
-    """Único ponto de contato entre a interface e o resto do sistema (Fachada).
+    """Fachada do fluxo da música: texto -> geração -> reprodução -> arquivo.
 
-    As telas só chamam métodos daqui e tratam GeradorMusicalErro para
-    mostrar mensagens. Assim, trocar a interface (tkinter -> web, por
-    exemplo) não exige mexer na interpretação (requisito não-funcional).
+    As telas só chamam métodos daqui (e do ControladorConfiguracao) e tratam
+    GeradorMusicalErro para mostrar mensagens. Assim, trocar a interface
+    (tkinter -> web, por exemplo) não exige mexer na interpretação
+    (requisito não-funcional).
 
     Todas as dependências chegam prontas pelo construtor (montadas em
-    main.criar_controlador), o que permite testar com versões falsas.
+    main.criar_controladores), o que permite testar com versões falsas.
     """
 
     def __init__(
         self,
         entrada: EntradaUsuario,
         parser: Parser,
-        configuracao: ConfiguracaoInicial,
         sintetizador: Sintetizador,
         player: Player,
         exportador: Exportador,
-        catalogo: CatalogoInstrumentos,
     ) -> None:
         """Recebe todas as dependências prontas.
 
         Args:
             entrada: texto do usuário.
-            parser: interpretação do texto.
-            configuracao: valores iniciais (a mesma usada pelo Parser).
+            parser: interpretação do texto (já com a ConfiguracaoInicial).
             sintetizador: conversão da Partitura em MIDI.
             player: reprodução.
             exportador: gravação do arquivo MIDI.
-            catalogo: instrumentos exibidos na tela.
         """
         self._entrada = entrada
         self._parser = parser
-        self._configuracao = configuracao
         self._sintetizador = sintetizador
         self._player = player
         self._exportador = exportador
-        self._catalogo = catalogo
         self._musica = None
+
     # ---- Texto ----------------------------------------------------------
 
     def atualizar_texto(self, texto: str) -> None:
@@ -98,7 +96,7 @@ class ControladorAplicacao:
 
     def limpar(self) -> None:
         """Nova composição: para a música, esvazia o texto e esquece a música."""
-        self._player.stop()
+        self._player.parar()
         self._entrada.limpar()
         self._musica = None
 
@@ -140,6 +138,7 @@ class ControladorAplicacao:
         """
         self._musica = self._sintetizador.gerar_musica(partitura)
         self._player.carregar(self._musica)
+
     # ---- Reprodução -----------------------------------------------------
 
     def tocar(self) -> None:
@@ -149,7 +148,7 @@ class ControladorAplicacao:
             MusicaNaoGeradaErro: nada foi gerado.
             AudioIndisponivelErro: este computador não consegue tocar MIDI.
         """
-        self._player.play()
+        self._player.tocar()
 
     def pausar(self) -> None:
         """Pausa a música."""
@@ -161,7 +160,7 @@ class ControladorAplicacao:
 
     def parar(self) -> None:
         """Para a música."""
-        self._player.stop()
+        self._player.parar()
 
     def reproducao_terminou(self) -> bool:
         """Diz se a música terminou sozinha (para o aviso de conclusão)."""
@@ -184,71 +183,3 @@ class ControladorAplicacao:
         if self._musica is None:
             raise MusicaNaoGeradaErro("Gere a música antes de salvar.")
         return self._exportador.exportar(self._musica, destino)
-
-    # ---- Configuração (bloco de parâmetros da tela principal) -----------
-
-    def listar_instrumentos(self) -> list[Instrumento]:
-        """Devolve os instrumentos do catálogo, para a lista da tela."""
-        return self._catalogo.listar()
-
-    def get_bpm(self) -> int:
-        """Devolve o BPM inicial."""
-        return self._configuracao.get_bpm_inicial()
-
-    def set_bpm(self, bpm: int) -> None:
-        """Altera o BPM inicial.
-
-        Raises:
-            ValueError: fora de [BPM_MINIMO, BPM_MAXIMO].
-        """
-        self._configuracao.set_bpm_inicial(bpm)
-
-
-    def get_instrumento_voz(self, indice_voz: int) -> int:
-        """Devolve o instrumento inicial (programa MIDI) da voz."""
-        return self._configuracao.get_instrumento_inicial(indice_voz)
-
-
-    def set_instrumento_voz(self, indice_voz: int, programa: int) -> None:
-        """Altera o instrumento inicial da voz.
-
-        Args:
-            indice_voz: número da voz.
-            programa: programa MIDI.
-
-        Raises:
-            ValueError: programa fora de 0–127.
-        """
-        self._configuracao.set_instrumento_inicial(indice_voz, programa)
-
-    def get_oitava_voz(self, indice_voz: int) -> int:
-        """Devolve a oitava inicial da voz."""
-        return self._configuracao.get_oitava_inicial(indice_voz)
-
-    def set_oitava_voz(self, indice_voz: int, oitava: int) -> None:
-        """Altera a oitava inicial da voz.
-
-        Args:
-            indice_voz: número da voz.
-            oitava: nova oitava.
-
-        Raises:
-            ValueError: fora de [OITAVA_MINIMA, OITAVA_MAXIMA].
-        """
-        self._configuracao.set_oitava_inicial(indice_voz, oitava)
-
-    def get_volume_voz(self, indice_voz: int) -> int:
-        """Devolve o volume inicial da voz."""
-        return self._configuracao.get_volume_inicial(indice_voz)
-
-    def set_volume_voz(self, indice_voz: int, volume: int) -> None:
-        """Altera o volume inicial da voz.
-
-        Args:
-            indice_voz: número da voz.
-            volume: novo volume.
-
-        Raises:
-            ValueError: fora de 0–127.
-        """
-        self._configuracao.set_volume_inicial(indice_voz, volume)

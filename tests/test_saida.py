@@ -16,7 +16,7 @@ from gerador_musical.musica.configuracao_inicial import ConfiguracaoInicial
 from gerador_musical.saida.exportador import ExportadorMidi
 from gerador_musical.saida.player import Player
 from gerador_musical.saida.sintetizador import Sintetizador
-from gerador_musical.saida.backend_audio import BackendAudio
+
 
 def gerar(texto):
     """Atalho: texto -> Partitura -> MidiFile, com as peças reais."""
@@ -90,18 +90,18 @@ def test_arquivo_exportado_pode_ser_lido_de_volta(tmp_path):
 # ---- Player (Etapa 9) ---------------------------------------------------
 
 
-def test_play_sem_musica_gera_erro(backend):
+def test_tocar_sem_musica_gera_erro(backend):
     with pytest.raises(MusicaNaoGeradaErro):
-        Player(backend).play()
+        Player(backend).tocar()
 
 
-def test_play_pausar_retomar_stop_chamam_backend(backend):
+def test_tocar_pausar_retomar_parar_chamam_backend(backend):
     player = Player(backend)
     player.carregar(gerar("C:3"))            # o carregar chama "parar" primeiro
-    player.play()
+    player.tocar()
     player.pausar()
     player.retomar()
-    player.stop()
+    player.parar()
     assert backend.chamadas == ["parar", "carregar", "tocar", "pausar", "retomar", "parar"]
 
 
@@ -109,16 +109,16 @@ def test_tocar_de_novo_nao_recria_a_musica(backend):
     musica = gerar("C:3")
     player = Player(backend)
     player.carregar(musica)
-    player.play()
-    player.stop()
-    player.play()
+    player.tocar()
+    player.parar()
+    player.tocar()
     assert player.musica is musica
 
 
 def test_pausado_nao_conta_como_terminou(backend):
     player = Player(backend)
     player.carregar(gerar("C:3"))
-    player.play()
+    player.tocar()
     player.pausar()
     backend.tocando = False                  # o pygame também diz "não tocando" quando pausado
     assert player.terminou() is False

@@ -6,7 +6,6 @@ from gerador_musical.interpretacao.regras.regra_mapeamento import (
     RegraPorCaractere,
 )
 from gerador_musical.interpretacao.tokens import TipoToken, Token
-from gerador_musical.musica.limites import PROGRAMA_MIDI_MAXIMO
 
 
 class RegraAtraso(RegraMapeamento):
@@ -136,6 +135,4 @@ class RegraInstrumentoSomaDigito(RegraPorCaractere):
             token: token CARACTERE com o dígito.
             contexto: estado da linha.
         """
-        p= contexto.parametros()
-        novo = (p.get_instrumento() + int(token.lexema))% (PROGRAMA_MIDI_MAXIMO + 1)
-        p.set_instrumento(novo)
+        contexto.parametros().somar_ao_instrumento(int(token.lexema))

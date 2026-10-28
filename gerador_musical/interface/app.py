@@ -3,6 +3,7 @@
 import tkinter as tk
 from tkinter import messagebox
 from gerador_musical.aplicacao.controlador import ControladorAplicacao
+from gerador_musical.aplicacao.controlador_configuracao import ControladorConfiguracao
 from gerador_musical.interface import estilo
 from gerador_musical.interface.tela_carregamento import TelaCarregamento
 from gerador_musical.interface.tela_principal import TelaPrincipal
@@ -14,21 +15,25 @@ class App(tk.Tk):
     Telas (croqui): "principal", "carregamento", "reproducao".
 
     Attributes:
-        controlador: fachada do sistema, usada pelas telas.
+        controlador: fachada do fluxo da música (texto, geração, reprodução).
+        controlador_configuracao: fachada das configurações iniciais (painel).
     """
 
     TITULO = "Gerador de Música a partir de Texto"
 
-    def __init__(self, controlador: ControladorAplicacao) -> None:
-        """Prepara o tema, cria a janela e guarda o controlador.
+    def __init__(self, controlador: ControladorAplicacao,
+                 controlador_configuracao: ControladorConfiguracao) -> None:
+        """Prepara o tema, cria a janela e guarda os controladores.
 
         Args:
-            controlador: fachada do sistema.
+            controlador: fachada do fluxo da música.
+            controlador_configuracao: fachada das configurações iniciais.
         """
         estilo.preparar_sistema()        # antes de criar a janela (fonte e nitidez no Windows)
         super().__init__()
         estilo.preparar(self)            # escolhe a fonte e calcula a escala
         self.controlador: ControladorAplicacao = controlador
+        self.controlador_configuracao: ControladorConfiguracao = controlador_configuracao
         self._telas: dict[str, tk.Frame] = {}
 
     def construir(self) -> None:

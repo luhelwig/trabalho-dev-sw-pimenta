@@ -8,6 +8,7 @@ Para rodar: python main.py
 """
 
 from gerador_musical.aplicacao.controlador import ControladorAplicacao
+from gerador_musical.aplicacao.controlador_configuracao import ControladorConfiguracao
 from gerador_musical.entrada.entrada_usuario import EntradaUsuario
 from gerador_musical.interface.app import App
 from gerador_musical.interpretacao.parser import Parser
@@ -21,31 +22,31 @@ from gerador_musical.saida.player import Player
 from gerador_musical.saida.sintetizador import Sintetizador
 
 
-def criar_controlador() -> ControladorAplicacao:
+def criar_controladores() -> tuple[ControladorAplicacao, ControladorConfiguracao]:
     """Instancia e conecta todas as peças do sistema.
 
     Cria o catálogo de instrumentos, a configuração inicial, o Parser (com
     Tokenizador e Mapeamento.padrao()), a entrada do usuário, o
     Sintetizador, o Player (com BackendPygame) e o ExportadorMidi. A mesma
-    ConfiguracaoInicial vai para o Parser e para o controlador: assim, o
-    que a tela muda pelo controlador é visto pelo Parser.
+    ConfiguracaoInicial vai para o Parser e para o ControladorConfiguracao:
+    assim, o que a tela muda no painel é visto pelo Parser.
 
     Returns:
-        O ControladorAplicacao pronto para ser usado pela interface.
+        (ControladorAplicacao, ControladorConfiguracao), prontos para a interface.
     """
     catalogo = CatalogoInstrumentos.padrao()
     configuracao = ConfiguracaoInicial.padrao()
     parser = Parser(Tokenizador(), Mapeamento.padrao(), configuracao)
-    return ControladorAplicacao(
-        entrada=EntradaUsuario(), parser=parser, configuracao=configuracao,
-        sintetizador=Sintetizador(), player=Player(BackendPygame()),
-        exportador=ExportadorMidi(), catalogo=catalogo,
+    controlador = ControladorAplicacao(
+        entrada=EntradaUsuario(), parser=parser, sintetizador=Sintetizador(),
+        player=Player(BackendPygame()), exportador=ExportadorMidi(),
     )
+    return controlador, ControladorConfiguracao(configuracao, catalogo)
 
 
 def main() -> None:
     """Cria a janela, monta as telas e entra no laço de eventos do tkinter."""
-    app = App(criar_controlador())
+    app = App(*criar_controladores())
     app.construir()
     app.mainloop()
 

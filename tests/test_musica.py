@@ -89,6 +89,12 @@ def test_reset_instrumento_volta_ao_inicial():
     assert p.get_instrumento() == 0
 
 
+def test_somar_ao_instrumento_passa_de_127_e_recomeca_do_0():
+    p = ParametrosMusica(instrumento_inicial=126, oitava_padrao=4, volume_padrao=100)
+    p.somar_ao_instrumento(4)
+    assert p.get_instrumento() == 2
+
+
 # ---- ConfiguracaoInicial ----------------------------------------------
 
 

@@ -68,13 +68,6 @@ class Voz:
         """Devolve a duração total da voz em beats, contando o atraso."""
         return self.posicao_atual_beats()
 
-    def ultima_nota(self) -> EventoMusical | None:
-        """Devolve o último evento do tipo nota, ou None se não houver."""
-        for evento in reversed(self.eventos):
-            if evento.eh_nota():
-                return evento
-        return None
-
     def canal_midi(self) -> int:
         """Devolve o canal MIDI da voz, pulando o canal de percussão (9).
 

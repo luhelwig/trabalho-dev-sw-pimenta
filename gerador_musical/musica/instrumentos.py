@@ -56,7 +56,6 @@ class CatalogoInstrumentos:
         Returns:
             CatalogoInstrumentos com programas MIDI de 0 a 127.
         """
-        """Catálogo com os 30 instrumentos escolhidos pelo grupo (programas MIDI 0–127)."""
         return cls([
             Instrumento(PIANO, "Piano"),
             Instrumento(CRAVO, "Cravo"),

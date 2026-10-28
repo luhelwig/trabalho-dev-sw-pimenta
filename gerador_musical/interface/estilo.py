@@ -11,7 +11,12 @@ Como funciona:
 
 Constantes: as cores do Figma (FUNDO, CARTAO, PAINEL, ESCURO, VERMELHO),
 a fonte (Micro 5, com Courier New de reserva), os tamanhos de texto
-(TITULO, TEXTO) e ICONES, os ícones desenhados numa grade 24x24.
+(TITULO, TEXTO), os estilos de texto prontos (ESTILO_*) e ICONES, os
+ícones desenhados numa grade 24x24.
+
+Fase 3 (bad smell "Lista de Parâmetros Longa"): posição e tamanho viajam
+juntos num objeto Caixa, e tamanho/cor/âncora de texto num EstiloTexto,
+em vez de 7 ou 8 parâmetros soltos em cada método
 """
 
 from __future__ import annotations
@@ -19,6 +24,7 @@ from __future__ import annotations
 import math
 import sys
 import tkinter as tk
+from dataclasses import dataclass, replace
 from pathlib import Path
 from tkinter import font as tkfont
 from typing import Callable
@@ -150,6 +156,92 @@ ICONES = {
 }
 
 
+
+@dataclass(frozen=True)
+class Caixa:
+    """Retângulo do Figma: posição e tamanho em px do Figma. Objeto de valor.
+
+    Agrupa x, y, largura e altura, que antes iam soltos para quase todos os
+    métodos de Desenho (refatoração "Introduzir Objeto-Parâmetro").
+
+    Attributes:
+        x: esquerda.
+        y: topo.
+        largura: largura.
+        altura: altura.
+    """
+
+    x: float
+    y: float
+    largura: float
+    altura: float
+
+    @property
+    def centro(self) -> tuple[float, float]:
+        """Ponto do meio da caixa, em px do Figma."""
+        return self.x + self.largura / 2, self.y + self.altura / 2
+
+    def em_pixels(self) -> tuple[int, int, int, int]:
+        """Devolve (esquerda, topo, direita, base) já convertidos por px()."""
+        return px(self.x), px(self.y), px(self.x + self.largura), px(self.y + self.altura)
+
+    def ponto_da_grade(self, a: float, b: float, divisoes: int = 24) -> tuple[int, int]:
+        """Converte um ponto de uma grade divisoes x divisoes dentro da caixa em pixels.
+
+        Args:
+            a: coluna na grade (0 = esquerda da caixa).
+            b: linha na grade (0 = topo da caixa).
+            divisoes: tamanho da grade (os ícones usam 24x24).
+        """
+        return px(self.x + a * self.largura / divisoes), px(self.y + b * self.altura / divisoes)
+
+    def expandida(self, margem_x: float, margem_y: float) -> Caixa:
+        """Devolve uma caixa maior, com a margem dada em cada lado."""
+        return Caixa(self.x - margem_x, self.y - margem_y,
+                     self.largura + 2 * margem_x, self.altura + 2 * margem_y)
+
+
+@dataclass(frozen=True)
+class EstiloTexto:
+    """Tamanho, cor e âncora de um texto. Objeto de valor.
+
+    Attributes:
+        tamanho: tamanho da fonte em px do Figma.
+        cor: cor do texto.
+        ancora: ponto do texto que fica na posição dada: "nw" canto superior
+            esquerdo, "n" meio de cima, "center" meio, "w" meio da esquerda,
+            "ne" canto superior direito.
+    """
+
+    tamanho: float = TEXTO
+    cor: str = ESCURO
+    ancora: str = "nw"
+
+    def com(self, **mudancas) -> EstiloTexto:
+        """Devolve uma cópia com alguns campos trocados, ex.: ESTILO_SECUNDARIO.com(ancora="ne")."""
+        return replace(self, **mudancas)
+
+
+# Estilos de texto usados nas telas (como "classes" de CSS)
+ESTILO_TITULO = EstiloTexto(tamanho=TITULO, ancora="n")      # "gerador de música"
+ESTILO_ROTULO = EstiloTexto()                                # "texto de entrada:", "upload:"
+ESTILO_SECUNDARIO = EstiloTexto(cor=FUNDO)                   # rótulos dentro dos painéis
+ESTILO_BOTAO = EstiloTexto(cor=PAINEL, ancora="center")      # texto no meio de botões e pílulas
+ESTILO_VALOR = EstiloTexto(cor=PAINEL, ancora="w")           # valor à esquerda de uma pílula
+
+
+def _contorno_arredondado(esquerda: int, topo: int, direita: int, base: int, raio: int) -> list[float]:
+    """Pontos de um retângulo cujos cantos são quartos de círculo (de 15 em 15 graus)."""
+    pontos = []
+    cantos = ((direita - raio, topo + raio, -90), (direita - raio, base - raio, 0),
+              (esquerda + raio, base - raio, 90), (esquerda + raio, topo + raio, 180))
+    for cx, cy, angulo_inicial in cantos:               # sentido horário, começando no topo-direita
+        for passo in range(7):                          # 0°, 15°, ..., 90° de cada canto
+            angulo = math.radians(angulo_inicial + 15 * passo)
+            pontos += [cx + raio * math.cos(angulo), cy + raio * math.sin(angulo)]
+    return pontos
+
+
 class Desenho(tk.Canvas):
     """Canvas que recebe medidas do Figma. Cada tela desenha nele."""
 
@@ -166,100 +258,76 @@ class Desenho(tk.Canvas):
 
     # ---- Formas -------------------------------------------------------------
 
-    def retangulo(self, x: float, y: float, largura: float, altura: float, raio: float, cor: str,
-                  tags: str | tuple = ()) -> int:
-        """Desenha um retângulo de cantos arredondados.
-
-        É um polígono cujos cantos são quartos de círculo, calculados de 15 em
-        15 graus (raio 0 = cantos retos).
+    def retangulo(self, caixa: Caixa, cor: str, raio: float = 0, tags: str | tuple = ()) -> int:
+        """Desenha um retângulo de cantos arredondados (raio 0 = cantos retos).
 
         Args:
-            x: esquerda, em px do Figma.
-            y: topo, em px do Figma.
-            largura: largura em px do Figma.
-            altura: altura em px do Figma.
-            raio: raio dos cantos em px do Figma.
+            caixa: posição e tamanho, em px do Figma.
             cor: cor de preenchimento e de contorno.
+            raio: raio dos cantos em px do Figma.
             tags: tags do tkinter (para agrupar itens clicáveis).
 
         Returns:
             O id do item no Canvas.
         """
-        x1, y1, x2, y2, r = px(x), px(y), px(x + largura), px(y + altura), px(raio)
-        if r == 0:
-            return self.create_rectangle(x1, y1, x2, y2, fill=cor, outline=cor, tags=tags)
-        pontos = []
-        cantos = ((x2 - r, y1 + r, -90), (x2 - r, y2 - r, 0), (x1 + r, y2 - r, 90), (x1 + r, y1 + r, 180))
-        for cx, cy, angulo_inicial in cantos:               # sentido horário, começando no topo-direita
-            for passo in range(7):                          # 0°, 15°, ..., 90° de cada canto
-                angulo = math.radians(angulo_inicial + 15 * passo)
-                pontos += [cx + r * math.cos(angulo), cy + r * math.sin(angulo)]
+        esquerda, topo, direita, base = caixa.em_pixels()
+        if px(raio) == 0:
+            return self.create_rectangle(esquerda, topo, direita, base, fill=cor, outline=cor, tags=tags)
+        pontos = _contorno_arredondado(esquerda, topo, direita, base, px(raio))
         return self.create_polygon(pontos, fill=cor, outline=cor, tags=tags)
 
-    def circulo(self, x: float, y: float, diametro: float, cor: str, tags: str | tuple = ()) -> int:
-        """Desenha um círculo preenchido.
+    def circulo(self, caixa: Caixa, cor: str, tags: str | tuple = ()) -> int:
+        """Desenha um círculo (ou elipse) preenchido dentro da caixa.
 
         Args:
-            x: esquerda, em px do Figma.
-            y: topo, em px do Figma.
-            diametro: diâmetro em px do Figma.
+            caixa: quadrado que contém o círculo, em px do Figma.
             cor: cor do círculo.
             tags: tags do tkinter.
 
         Returns:
             O id do item no Canvas.
         """
-        return self.create_oval(px(x), px(y), px(x + diametro), px(y + diametro), fill=cor, outline=cor, tags=tags)
+        return self.create_oval(*caixa.em_pixels(), fill=cor, outline=cor, tags=tags)
 
-    def texto(self, x: float, y: float, texto: str, tamanho: float = TEXTO, cor: str = ESCURO,
-              ancora: str = "nw", tags: str | tuple = ()) -> int:
+    def texto(self, x: float, y: float, texto: str, estilo: EstiloTexto = ESTILO_ROTULO,
+              tags: str | tuple = ()) -> int:
         """Escreve um texto na fonte do tema.
 
         Args:
             x: posição horizontal, em px do Figma.
             y: posição vertical, em px do Figma.
             texto: o que escrever.
-            tamanho: tamanho da fonte em px do Figma.
-            cor: cor do texto.
-            ancora: ponto do texto que fica em (x, y): "nw" canto superior
-                esquerdo, "center" meio, "ne" canto superior direito...
+            estilo: tamanho, cor e âncora (ver ESTILO_*).
             tags: tags do tkinter.
 
         Returns:
             O id do item no Canvas (para trocar o texto depois com itemconfig).
         """
-        return self.create_text(px(x), px(y), text=texto, fill=cor, font=fonte(tamanho), anchor=ancora, tags=tags)
+        return self.create_text(px(x), px(y), text=texto, fill=estilo.cor, font=fonte(estilo.tamanho),
+                                anchor=estilo.ancora, tags=tags)
 
-    def icone(self, nome: str, x: float, y: float, largura: float, altura: float, cor: str,
-              espessura: float = 3.5, tags: str | tuple = ()) -> None:
+    def icone(self, nome: str, caixa: Caixa, cor: str, espessura: float = 3.5, tags: str | tuple = ()) -> None:
         """Desenha um ícone de ICONES dentro de uma caixa do Figma.
 
         Args:
             nome: chave em ICONES ("upload", "nuvem", "alto_falante", "tocar", "pausar").
-            x: esquerda da caixa, em px do Figma.
-            y: topo da caixa, em px do Figma.
-            largura: largura da caixa.
-            altura: altura da caixa.
+            caixa: onde o ícone fica, em px do Figma.
             cor: cor do traço.
             espessura: espessura do traço em px do Figma.
             tags: tags do tkinter.
         """
-        def ponto(a: float, b: float) -> tuple[int, int]:
-            """Converte um ponto da grade 24x24 do ícone em pixels da tela."""
-            return px(x + a * largura / 24), px(y + b * altura / 24)
-
-        traco = max(1, px(espessura))
+        opcoes = {"width": max(1, px(espessura)), "tags": tags}
         for tipo, *dados in ICONES[nome]:
             if tipo == "linha":
-                pontos = [c for a, b in dados for c in ponto(a, b)]
-                self.create_line(pontos, fill=cor, width=traco, capstyle="round", joinstyle="round", tags=tags)
-            elif tipo == "circulo":
-                cx, cy, r = dados
-                self.create_oval(*ponto(cx - r, cy - r), *ponto(cx + r, cy + r), outline=cor, width=traco, tags=tags)
-            else:  # arco
-                cx, cy, r, inicio, extensao = dados
-                self.create_arc(*ponto(cx - r, cy - r), *ponto(cx + r, cy + r), start=inicio, extent=extensao,
-                                style="arc", outline=cor, width=traco, tags=tags)
+                pontos = [c for a, b in dados for c in caixa.ponto_da_grade(a, b)]
+                self.create_line(pontos, fill=cor, capstyle="round", joinstyle="round", **opcoes)
+                continue
+            cx, cy, r = dados[:3]
+            cantos = (*caixa.ponto_da_grade(cx - r, cy - r), *caixa.ponto_da_grade(cx + r, cy + r))
+            if tipo == "circulo":
+                self.create_oval(*cantos, outline=cor, **opcoes)
+            else:  # arco: dados[3:] = (início, extensão) em graus
+                self.create_arc(*cantos, start=dados[3], extent=dados[4], style="arc", outline=cor, **opcoes)
 
     def pintar(self, item: int, cor: str) -> None:
         """Troca a cor de uma forma (ex.: aba de voz selecionada).
@@ -270,20 +338,18 @@ class Desenho(tk.Canvas):
         """
         self.itemconfig(item, fill=cor, outline=cor)
 
-    def widget(self, x: float, y: float, largura: float, altura: float, widget: tk.Widget) -> int:
+    def widget(self, caixa: Caixa, widget: tk.Widget) -> int:
         """Coloca um widget do tkinter (ex.: tk.Text) na posição do Figma.
 
         Args:
-            x: esquerda, em px do Figma.
-            y: topo, em px do Figma.
-            largura: largura em px do Figma.
-            altura: altura em px do Figma.
+            caixa: posição e tamanho, em px do Figma.
             widget: o widget a posicionar.
 
         Returns:
             O id da janela no Canvas.
         """
-        return self.create_window(px(x), px(y), window=widget, anchor="nw", width=px(largura), height=px(altura))
+        return self.create_window(px(caixa.x), px(caixa.y), window=widget, anchor="nw",
+                                  width=px(caixa.largura), height=px(caixa.altura))
 
     # ---- Cliques ------------------------------------------------------------
 
@@ -303,17 +369,14 @@ class Desenho(tk.Canvas):
         self.tag_bind(tag, "<Enter>", lambda evento: self.config(cursor="hand2"))
         self.tag_bind(tag, "<Leave>", lambda evento: self.config(cursor=""))
 
-    def botao(self, x: float, y: float, largura: float, altura: float, texto: str,
-              comando: Callable[[], None], cor: str = ESCURO, raio: float = 22) -> tuple[int, int]:
+    def botao(self, caixa: Caixa, texto: str, comando: Callable[[], None], cor: str = ESCURO,
+              raio: float = 22) -> tuple[int, int]:
         """Desenha um botão arredondado com texto creme no meio.
 
         cor=ESCURO é o botão principal; cor=FUNDO é a pílula secundária.
 
         Args:
-            x: esquerda, em px do Figma.
-            y: topo, em px do Figma.
-            largura: largura em px do Figma.
-            altura: altura em px do Figma.
+            caixa: posição e tamanho, em px do Figma.
             texto: rótulo do botão.
             comando: função chamada no clique.
             cor: cor do fundo.
@@ -323,8 +386,8 @@ class Desenho(tk.Canvas):
             (id do fundo, id do texto), para mudar a cor ou o texto depois.
         """
         tag = self.nova_tag()
-        fundo = self.retangulo(x, y, largura, altura, raio, cor, tags=tag)
-        rotulo = self.texto(x + largura / 2, y + altura / 2, texto, cor=PAINEL, ancora="center", tags=tag)
+        fundo = self.retangulo(caixa, cor, raio=raio, tags=tag)
+        rotulo = self.texto(*caixa.centro, texto, ESTILO_BOTAO, tags=tag)
         self.tornar_clicavel(tag, comando)
         return fundo, rotulo
 
@@ -334,31 +397,30 @@ class Deslizador:
 
     Attributes:
         DIAMETRO: diâmetro da bolinha em px do Figma.
+        AREA_DE_CLIQUE: margem (x, y) em volta do trilho que também aceita clique.
     """
 
     DIAMETRO = 24
+    AREA_DE_CLIQUE = (15, 20)
 
-    def __init__(self, desenho: Desenho, x: float, y: float, largura: float, minimo: int, maximo: int,
+    def __init__(self, desenho: Desenho, trilho: Caixa, minimo: int, maximo: int,
                  comando: Callable[[int], None]) -> None:
         """Desenha o deslizador e liga clique e arrasto.
 
         Args:
             desenho: Canvas onde desenhar.
-            x: início do trilho, em px do Figma.
-            y: topo do trilho, em px do Figma.
-            largura: comprimento do trilho.
+            trilho: posição e tamanho do trilho, em px do Figma.
             minimo: valor na ponta esquerda.
             maximo: valor na ponta direita.
             comando: função chamada com o novo valor quando o usuário arrasta.
         """
         self.desenho = desenho
-        self.x, self.largura = x, largura
-        self.centro_y = y + 3.5
+        self.trilho = trilho
         self.minimo, self.maximo = minimo, maximo
         self.comando = comando
         tag = desenho.nova_tag()
-        desenho.retangulo(x - 15, y - 20, largura + 30, 47, 0, PAINEL, tags=tag)   # área de clique maior
-        desenho.retangulo(x, y, largura, 7, 3.5, FUNDO, tags=tag)                  # trilho
+        desenho.retangulo(trilho.expandida(*self.AREA_DE_CLIQUE), PAINEL, tags=tag)
+        desenho.retangulo(trilho, FUNDO, raio=trilho.altura / 2, tags=tag)
         self.bolinha = desenho.create_oval(0, 0, 0, 0, fill=ESCURO, outline=ESCURO, tags=tag)
         desenho.tag_bind(tag, "<Button-1>", self._ao_arrastar)
         desenho.tag_bind(tag, "<B1-Motion>", self._ao_arrastar)
@@ -369,11 +431,13 @@ class Deslizador:
         """Move a bolinha para a posição do valor (não chama o comando).
 
         Args:
-            valor: valor entre mínimo e máximo.
+            valor: valor entre mínimo e máximo (fora disso, a bolinha fica na ponta).
         """
         fracao = min(1.0, max(0.0, (valor - self.minimo) / (self.maximo - self.minimo)))
-        cx, r = self.x + fracao * self.largura, self.DIAMETRO / 2
-        self.desenho.coords(self.bolinha, px(cx - r), px(self.centro_y - r), px(cx + r), px(self.centro_y + r))
+        _, centro_y = self.trilho.centro
+        x = self.trilho.x + fracao * self.trilho.largura - self.DIAMETRO / 2
+        bolinha = Caixa(x, centro_y - self.DIAMETRO / 2, self.DIAMETRO, self.DIAMETRO)
+        self.desenho.coords(self.bolinha, *bolinha.em_pixels())
 
     def _ao_arrastar(self, evento: tk.Event) -> None:
         """Converte a posição do mouse em valor, move a bolinha e chama o comando.
@@ -381,8 +445,8 @@ class Deslizador:
         Args:
             evento: clique ou movimento do mouse (usa evento.x).
         """
-        fracao = (evento.x - px(self.x)) / px(self.largura)
-        fracao = min(1.0, max(0.0, fracao))
+        esquerda, _, direita, _ = self.trilho.em_pixels()
+        fracao = min(1.0, max(0.0, (evento.x - esquerda) / (direita - esquerda)))
         valor = round(self.minimo + fracao * (self.maximo - self.minimo))
         self.set(valor)
         self.comando(valor)

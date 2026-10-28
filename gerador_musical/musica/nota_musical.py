@@ -2,7 +2,6 @@
 
 from dataclasses import dataclass
 from enum import Enum
-from operator import and_
 
 
 class Acidente(Enum):

@@ -105,10 +105,10 @@ gerador_musical/
   interpretacao/            lê o texto: tokenizador, parser e as regras do mapeamento
   musica/                   notas, durações, vozes, partitura, instrumentos
   saida/                    gera o MIDI, toca e exporta
-  aplicacao/                controlador (a interface só conversa com ele)
+  aplicacao/                controladores (a interface só conversa com eles)
   interface/                telas em tkinter, com o visual do croqui do Figma
 tests/                      testes automáticos (pytest)
-docs/figma-fase2/           telas do croqui da fase 2
+docs/explicacao-do-codigo.md  explicação de cada classe e função, e os bad smells corrigidos na fase 3
 ```
 
 Cada linha da tabela de mapeamento é uma classe de regra. Para criar um comando novo, basta escrever uma regra e adicioná-la em `Mapeamento.padrao()`, sem mexer no resto do código.
